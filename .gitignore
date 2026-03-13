@@ -1,0 +1,28 @@
+# Dependencias
+node_modules/
+frontend/node_modules/
+
+# Build
+dist/
+frontend/.next/
+
+# Entorno (NUNCA subir claves)
+.env
+.env.local
+frontend/.env.local
+frontend/.env.*.local
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# TypeORM cache
+.typeorm-cache/

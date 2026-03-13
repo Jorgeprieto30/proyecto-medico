@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker info:*)",
+      "Bash(docker context:*)",
+      "Bash(DOCKER_HOST=unix:///Users/jprietoleighton/.docker/run/docker.sock docker-compose up -d)",
+      "Read(//Users/jprietoleighton/.docker/run/**)",
+      "Read(//var/run/**)",
+      "Bash(docker -H unix:///var/run/docker.sock ps)",
+      "Bash(docker -H unix:///Users/jprietoleighton/.docker/run/docker.sock ps)"
+    ]
+  }
+}

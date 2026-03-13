@@ -1,0 +1,135 @@
+import type {
+  ApiResponse,
+  Service, CreateServiceDto, UpdateServiceDto,
+  ScheduleRule, CreateScheduleRuleDto, UpdateScheduleRuleDto,
+  ScheduleBlock, CreateScheduleBlockDto, UpdateScheduleBlockDto,
+  ServiceException, CreateExceptionDto, UpdateExceptionDto,
+  SlotAvailability, SlotDetail,
+  Reservation, CreateReservationDto,
+} from '@/types';
+
+const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+
+class ApiError extends Error {
+  constructor(
+    public statusCode: number,
+    message: string,
+    public details?: unknown,
+  ) {
+    super(message);
+  }
+}
+
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json', ...options.headers },
+    ...options,
+  });
+
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    const msg = Array.isArray(json.message)
+      ? json.message.join(', ')
+      : json.message || `Error ${res.status}`;
+    throw new ApiError(res.status, msg, json);
+  }
+
+  // Backend wraps responses in { data, timestamp }
+  return (json.data ?? json) as T;
+}
+
+// ─── Services ────────────────────────────────────────────────────────────────
+export const servicesApi = {
+  list: () => request<Service[]>('/services'),
+  get: (id: number) => request<Service>(`/services/${id}`),
+  create: (dto: CreateServiceDto) =>
+    request<Service>('/services', { method: 'POST', body: JSON.stringify(dto) }),
+  update: (id: number, dto: UpdateServiceDto) =>
+    request<Service>(`/services/${id}`, { method: 'PATCH', body: JSON.stringify(dto) }),
+};
+
+// ─── Schedule Rules ───────────────────────────────────────────────────────────
+export const rulesApi = {
+  list: (serviceId: number) =>
+    request<ScheduleRule[]>(`/services/${serviceId}/schedule-rules`),
+  create: (serviceId: number, dto: CreateScheduleRuleDto) =>
+    request<ScheduleRule>(`/services/${serviceId}/schedule-rules`, {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    }),
+  update: (ruleId: number, dto: UpdateScheduleRuleDto) =>
+    request<ScheduleRule>(`/schedule-rules/${ruleId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(dto),
+    }),
+  delete: (ruleId: number) =>
+    request<void>(`/schedule-rules/${ruleId}`, { method: 'DELETE' }),
+};
+
+// ─── Schedule Blocks ──────────────────────────────────────────────────────────
+export const blocksApi = {
+  list: (serviceId: number) =>
+    request<ScheduleBlock[]>(`/services/${serviceId}/schedule-blocks`),
+  create: (serviceId: number, dto: CreateScheduleBlockDto) =>
+    request<ScheduleBlock>(`/services/${serviceId}/schedule-blocks`, {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    }),
+  update: (blockId: number, dto: UpdateScheduleBlockDto) =>
+    request<ScheduleBlock>(`/schedule-blocks/${blockId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(dto),
+    }),
+  delete: (blockId: number) =>
+    request<void>(`/schedule-blocks/${blockId}`, { method: 'DELETE' }),
+};
+
+// ─── Exceptions ───────────────────────────────────────────────────────────────
+export const exceptionsApi = {
+  list: (serviceId: number) =>
+    request<ServiceException[]>(`/services/${serviceId}/exceptions`),
+  create: (serviceId: number, dto: CreateExceptionDto) =>
+    request<ServiceException>(`/services/${serviceId}/exceptions`, {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    }),
+  update: (exceptionId: number, dto: UpdateExceptionDto) =>
+    request<ServiceException>(`/exceptions/${exceptionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(dto),
+    }),
+  delete: (exceptionId: number) =>
+    request<void>(`/exceptions/${exceptionId}`, { method: 'DELETE' }),
+};
+
+// ─── Availability ─────────────────────────────────────────────────────────────
+export const availabilityApi = {
+  byDate: (serviceId: number, date: string) =>
+    request<SlotAvailability[]>(
+      `/availability?service_id=${serviceId}&date=${date}`,
+    ),
+  bySlot: (serviceId: number, datetime: string) =>
+    request<SlotDetail>(
+      `/availability/slot?service_id=${serviceId}&datetime=${encodeURIComponent(datetime)}`,
+    ),
+};
+
+// ─── Reservations ─────────────────────────────────────────────────────────────
+export const reservationsApi = {
+  list: (opts: { service_id?: number; date?: string; status?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (opts.service_id) params.set('service_id', String(opts.service_id));
+    if (opts.date) params.set('date', opts.date);
+    if (opts.status) params.set('status', opts.status);
+    return request<Reservation[]>(`/reservations?${params}`);
+  },
+  get: (id: number) => request<Reservation>(`/reservations/${id}`),
+  create: (dto: CreateReservationDto) =>
+    request<Reservation>('/reservations', { method: 'POST', body: JSON.stringify(dto) }),
+  cancel: (id: number) =>
+    request<Reservation>(`/reservations/${id}/cancel`, { method: 'PATCH' }),
+};
