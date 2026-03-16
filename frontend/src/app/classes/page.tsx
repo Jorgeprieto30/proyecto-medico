@@ -109,7 +109,7 @@ export default function ClassesPage() {
 
   const saveMutation = useMutation({
     mutationFn: async (data: ClassForm) => {
-      let serviceId: number;
+      let serviceId: string;
 
       if (editing) {
         // Update service basic info
@@ -159,7 +159,7 @@ export default function ClassesPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id: string) => {
       await servicesApi.update(id, { isActive: false });
     },
     onSuccess: () => {

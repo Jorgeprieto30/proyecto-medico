@@ -30,7 +30,7 @@ const exSchema = z.object({
 });
 type ExForm = z.infer<typeof exSchema>;
 
-export function ExceptionsTab({ serviceId }: { serviceId: number }) {
+export function ExceptionsTab({ serviceId }: { serviceId: string }) {
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ServiceException | null>(null);

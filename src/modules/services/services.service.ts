@@ -28,7 +28,7 @@ export class ServicesService {
     return this.serviceRepo.find({ order: { id: 'ASC' } });
   }
 
-  async findOne(id: number): Promise<Service> {
+  async findOne(id: string): Promise<Service> {
     const service = await this.serviceRepo.findOne({ where: { id } });
     if (!service) {
       throw new NotFoundException(`Servicio con id ${id} no encontrado`);
@@ -36,13 +36,13 @@ export class ServicesService {
     return service;
   }
 
-  async update(id: number, dto: UpdateServiceDto): Promise<Service> {
+  async update(id: string, dto: UpdateServiceDto): Promise<Service> {
     const service = await this.findOne(id);
     Object.assign(service, dto);
     return this.serviceRepo.save(service);
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: string): Promise<void> {
     const service = await this.findOne(id);
     if (service.isActive) {
       throw new BadRequestException(

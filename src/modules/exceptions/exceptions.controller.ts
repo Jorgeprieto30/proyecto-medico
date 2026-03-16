@@ -28,13 +28,13 @@ export class ExceptionsController {
 
   @Post('services/:serviceId/exceptions')
   @ApiOperation({ summary: 'Crear una excepción por fecha para un servicio' })
-  @ApiParam({ name: 'serviceId', type: Number })
+  @ApiParam({ name: 'serviceId', type: String })
   @ApiBody({ type: CreateExceptionDto })
   @ApiResponse({ status: 201, type: ServiceException })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 404, description: 'Servicio no encontrado' })
   create(
-    @Param('serviceId', ParseIntPipe) serviceId: number,
+    @Param('serviceId') serviceId: string,
     @Body() dto: CreateExceptionDto,
   ): Promise<ServiceException> {
     return this.exceptionsService.create(serviceId, dto);
@@ -42,10 +42,10 @@ export class ExceptionsController {
 
   @Get('services/:serviceId/exceptions')
   @ApiOperation({ summary: 'Listar excepciones de un servicio' })
-  @ApiParam({ name: 'serviceId', type: Number })
+  @ApiParam({ name: 'serviceId', type: String })
   @ApiResponse({ status: 200, type: [ServiceException] })
   findAll(
-    @Param('serviceId', ParseIntPipe) serviceId: number,
+    @Param('serviceId') serviceId: string,
   ): Promise<ServiceException[]> {
     return this.exceptionsService.findAllByService(serviceId);
   }

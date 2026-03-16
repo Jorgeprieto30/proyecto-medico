@@ -43,7 +43,7 @@ export default function ServicesPage() {
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
-  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data: services, isLoading } = useQuery({
     queryKey: ['services'],
@@ -97,7 +97,7 @@ export default function ServicesPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => servicesApi.delete(id),
+    mutationFn: (id: string) => servicesApi.delete(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['services'] });
       toast.success('Servicio eliminado');

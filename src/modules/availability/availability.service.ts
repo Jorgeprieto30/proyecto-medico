@@ -56,7 +56,7 @@ export class AvailabilityService {
    * Retorna todos los bloques válidos con su ocupación.
    */
   async getAvailabilityByDate(
-    serviceId: number,
+    serviceId: string,
     date: string,
   ): Promise<SlotAvailabilityDto[]> {
     const service = await this.servicesService.findOne(serviceId);
@@ -95,7 +95,7 @@ export class AvailabilityService {
    * Consulta disponibilidad de un bloque puntual.
    */
   async getAvailabilityBySlot(
-    serviceId: number,
+    serviceId: string,
     datetimeStr: string,
   ): Promise<SlotDetailDto> {
     const service = await this.servicesService.findOne(serviceId);
@@ -153,7 +153,7 @@ export class AvailabilityService {
    * Aplica: reglas semanales → excepciones → bloques de capacidad.
    */
   async generateSlots(
-    serviceId: number,
+    serviceId: string,
     date: string,
     timezone: string,
     slotDurationMinutes: number,
@@ -358,7 +358,7 @@ export class AvailabilityService {
    * Retorna un mapa { slot_start_iso: count }
    */
   private async getReservationCountsBySlots(
-    serviceId: number,
+    serviceId: string,
     slotStarts: DateTime[],
   ): Promise<Record<string, number>> {
     if (slotStarts.length === 0) return {};
@@ -396,7 +396,7 @@ export class AvailabilityService {
    * Retorna null si el slot no existe o no tiene cupos disponibles.
    */
   async validateSlotForReservation(
-    serviceId: number,
+    serviceId: string,
     slotStartUtc: Date,
   ): Promise<{ slotEnd: Date; capacity: number } | null> {
     const service = await this.servicesService.findOne(serviceId);

@@ -29,7 +29,7 @@ const blockSchema = z.object({
 });
 type BlockForm = z.infer<typeof blockSchema>;
 
-export function ScheduleBlocksTab({ serviceId }: { serviceId: number }) {
+export function ScheduleBlocksTab({ serviceId }: { serviceId: string }) {
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ScheduleBlock | null>(null);

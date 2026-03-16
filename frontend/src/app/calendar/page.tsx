@@ -64,7 +64,7 @@ function changeDate(dateStr: string, days: number): string {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface CalendarSlot extends SlotAvailability {
-  serviceId: number;
+  serviceId: string;
   serviceName: string;
   timezone: string;
   colorIdx: number;
@@ -76,7 +76,7 @@ interface CalendarSlot extends SlotAvailability {
 
 export default function CalendarPage() {
   const [date, setDate] = useState(todayAsString());
-  const [filterServiceId, setFilterServiceId] = useState<number>(0);
+  const [filterServiceId, setFilterServiceId] = useState<string>('');
   const [selectedSlot, setSelectedSlot] = useState<CalendarSlot | null>(null);
 
   const { data: services = [], isLoading: loadingServices } = useQuery({
@@ -106,7 +106,7 @@ export default function CalendarPage() {
     const all: CalendarSlot[] = [];
 
     availabilityQueries.data.forEach(({ svc, slots }, svcIdx) => {
-      if (filterServiceId > 0 && svc.id !== filterServiceId) return;
+      if (filterServiceId && svc.id !== filterServiceId) return;
       const colorIdx = svcIdx % COLORS.length;
 
       slots.forEach((slot) => {
@@ -167,10 +167,10 @@ export default function CalendarPage() {
         <div className="ml-auto w-52">
           <select
             value={filterServiceId}
-            onChange={(e) => setFilterServiceId(Number(e.target.value))}
+            onChange={(e) => setFilterServiceId(e.target.value)}
             className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           >
-            <option value={0}>Todas las clases</option>
+            <option value="">Todas las clases</option>
             {services.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
@@ -182,7 +182,7 @@ export default function CalendarPage() {
       {activeServices.length > 0 && (
         <div className="flex flex-wrap gap-3">
           {activeServices
-            .filter((s) => filterServiceId === 0 || s.id === filterServiceId)
+            .filter((s) => !filterServiceId || s.id === filterServiceId)
             .map((svc, i) => (
               <div key={svc.id} className="flex items-center gap-1.5 text-xs text-gray-600">
                 <span className={`w-3 h-3 rounded-full ${COLORS[i % COLORS.length].bg}`} />

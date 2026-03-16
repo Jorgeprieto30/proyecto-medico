@@ -18,7 +18,7 @@ export class ScheduleRulesService {
     private readonly servicesService: ServicesService,
   ) {}
 
-  async create(serviceId: number, dto: CreateScheduleRuleDto): Promise<ScheduleRule> {
+  async create(serviceId: string, dto: CreateScheduleRuleDto): Promise<ScheduleRule> {
     // Verificar que el servicio exista
     await this.servicesService.findOne(serviceId);
 
@@ -35,7 +35,7 @@ export class ScheduleRulesService {
     return this.ruleRepo.save(rule);
   }
 
-  async findAllByService(serviceId: number): Promise<ScheduleRule[]> {
+  async findAllByService(serviceId: string): Promise<ScheduleRule[]> {
     await this.servicesService.findOne(serviceId);
     return this.ruleRepo.find({
       where: { serviceId },
@@ -73,7 +73,7 @@ export class ScheduleRulesService {
   }
 
   /** Uso interno: obtener reglas activas para un día de semana */
-  async findActiveByServiceAndDay(serviceId: number, dayOfWeek: number): Promise<ScheduleRule[]> {
+  async findActiveByServiceAndDay(serviceId: string, dayOfWeek: number): Promise<ScheduleRule[]> {
     return this.ruleRepo.find({
       where: { serviceId, dayOfWeek, isActive: true },
       order: { startTime: 'ASC' },

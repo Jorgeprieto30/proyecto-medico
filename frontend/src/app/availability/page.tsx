@@ -34,8 +34,8 @@ function AvailabilityContent() {
   const searchParams = useSearchParams();
   const qc = useQueryClient();
 
-  const [serviceId, setServiceId] = useState<number>(
-    Number(searchParams.get('service_id')) || 0,
+  const [serviceId, setServiceId] = useState<string>(
+    searchParams.get('service_id') || '',
   );
   const [date, setDate] = useState(searchParams.get('date') || todayAsString());
   const [bookingSlot, setBookingSlot] = useState<SlotAvailability | null>(null);
@@ -103,10 +103,10 @@ function AvailabilityContent() {
           <Label>Servicio</Label>
           <select
             value={serviceId}
-            onChange={(e) => setServiceId(Number(e.target.value))}
+            onChange={(e) => setServiceId(e.target.value)}
             className="mt-1 flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           >
-            <option value={0} disabled>Seleccionar servicio...</option>
+            <option value="" disabled>Seleccionar servicio...</option>
             {services?.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
@@ -134,7 +134,7 @@ function AvailabilityContent() {
           </div>
         </div>
 
-        {serviceId > 0 && (
+        {!!serviceId && (
           <Button
             variant="ghost"
             size="sm"

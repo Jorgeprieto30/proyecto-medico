@@ -21,7 +21,7 @@ import { PageSpinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 
 const createSchema = z.object({
-  service_id: z.coerce.number().min(1, 'Selecciona un servicio'),
+  service_id: z.string().min(1, 'Selecciona un servicio'),
   slot_start: z.string().min(1, 'Requerido'),
   customer_name: z.string().optional(),
   customer_external_id: z.string().optional(),
@@ -32,7 +32,7 @@ export default function ReservationsPage() {
   const qc = useQueryClient();
 
   // Filters
-  const [serviceId, setServiceId] = useState<number>(0);
+  const [serviceId, setServiceId] = useState<string>('');
   const [date, setDate] = useState(todayAsString());
   const [statusFilter, setStatusFilter] = useState<string>('');
 
@@ -72,7 +72,7 @@ export default function ReservationsPage() {
   const formServiceId = watch('service_id');
 
   // Load slots when service changes in form
-  const loadSlots = async (svcId: number, d: string) => {
+  const loadSlots = async (svcId: string, d: string) => {
     if (!svcId || !d) return;
     try {
       const data = await availabilityApi.byDate(svcId, d);
@@ -105,7 +105,7 @@ export default function ReservationsPage() {
   });
 
   const openCreate = () => {
-    reset({ service_id: 0, slot_start: '', customer_name: '', customer_external_id: '' });
+    reset({ service_id: '', slot_start: '', customer_name: '', customer_external_id: '' });
     setSlots([]);
     setCreateOpen(true);
   };
@@ -134,10 +134,10 @@ export default function ReservationsPage() {
           <Label>Servicio</Label>
           <select
             value={serviceId}
-            onChange={(e) => setServiceId(Number(e.target.value))}
+            onChange={(e) => setServiceId(e.target.value)}
             className="mt-1 flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           >
-            <option value={0}>Todos los servicios</option>
+            <option value="">Todos los servicios</option>
             {services?.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
@@ -255,14 +255,13 @@ export default function ReservationsPage() {
           <div>
             <Label>Servicio *</Label>
             <select
-              {...register('service_id', { valueAsNumber: true })}
+              {...register('service_id')}
               className="mt-1 flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               onChange={(e) => {
-                const val = Number(e.target.value);
-                loadSlots(val, todayAsString());
+                loadSlots(e.target.value, todayAsString());
               }}
             >
-              <option value={0} disabled>Seleccionar servicio...</option>
+              <option value="" disabled>Seleccionar servicio...</option>
               {services?.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
@@ -304,7 +303,7 @@ export default function ReservationsPage() {
                 );
               })}
             </select>
-            {slots.length === 0 && formServiceId > 0 && (
+            {slots.length === 0 && !!formServiceId && (
               <p className="text-xs text-gray-400 mt-1">
                 Selecciona un servicio y fecha para ver los slots disponibles.
               </p>

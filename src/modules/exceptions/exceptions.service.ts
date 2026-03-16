@@ -17,7 +17,7 @@ export class ExceptionsService {
     private readonly servicesService: ServicesService,
   ) {}
 
-  async create(serviceId: number, dto: CreateExceptionDto): Promise<ServiceException> {
+  async create(serviceId: string, dto: CreateExceptionDto): Promise<ServiceException> {
     await this.servicesService.findOne(serviceId);
 
     const exception = this.exceptionRepo.create({
@@ -32,7 +32,7 @@ export class ExceptionsService {
     return this.exceptionRepo.save(exception);
   }
 
-  async findAllByService(serviceId: number): Promise<ServiceException[]> {
+  async findAllByService(serviceId: string): Promise<ServiceException[]> {
     await this.servicesService.findOne(serviceId);
     return this.exceptionRepo.find({
       where: { serviceId },
@@ -67,7 +67,7 @@ export class ExceptionsService {
   }
 
   /** Uso interno: obtener excepciones de un servicio para una fecha específica */
-  async findByServiceAndDate(serviceId: number, date: string): Promise<ServiceException[]> {
+  async findByServiceAndDate(serviceId: string, date: string): Promise<ServiceException[]> {
     return this.exceptionRepo.find({
       where: { serviceId, exceptionDate: date },
       order: { startTime: 'ASC' },

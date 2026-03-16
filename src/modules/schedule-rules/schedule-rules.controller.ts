@@ -27,13 +27,13 @@ export class ScheduleRulesController {
 
   @Post('services/:serviceId/schedule-rules')
   @ApiOperation({ summary: 'Crear una regla semanal para un servicio' })
-  @ApiParam({ name: 'serviceId', type: Number })
+  @ApiParam({ name: 'serviceId', type: String })
   @ApiBody({ type: CreateScheduleRuleDto })
   @ApiResponse({ status: 201, type: ScheduleRule })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 404, description: 'Servicio no encontrado' })
   create(
-    @Param('serviceId', ParseIntPipe) serviceId: number,
+    @Param('serviceId') serviceId: string,
     @Body() dto: CreateScheduleRuleDto,
   ): Promise<ScheduleRule> {
     return this.rulesService.create(serviceId, dto);
@@ -41,11 +41,11 @@ export class ScheduleRulesController {
 
   @Get('services/:serviceId/schedule-rules')
   @ApiOperation({ summary: 'Listar reglas semanales de un servicio' })
-  @ApiParam({ name: 'serviceId', type: Number })
+  @ApiParam({ name: 'serviceId', type: String })
   @ApiResponse({ status: 200, type: [ScheduleRule] })
   @ApiResponse({ status: 404, description: 'Servicio no encontrado' })
   findAll(
-    @Param('serviceId', ParseIntPipe) serviceId: number,
+    @Param('serviceId') serviceId: string,
   ): Promise<ScheduleRule[]> {
     return this.rulesService.findAllByService(serviceId);
   }

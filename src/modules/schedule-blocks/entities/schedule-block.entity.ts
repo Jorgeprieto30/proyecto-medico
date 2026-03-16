@@ -30,9 +30,9 @@ export class ScheduleBlock {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ApiProperty({ example: 1 })
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   @Column({ name: 'service_id' })
-  serviceId: number;
+  serviceId: string;
 
   @ManyToOne(() => Service, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'service_id' })

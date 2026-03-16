@@ -28,7 +28,7 @@ const ruleSchema = z.object({
 });
 type RuleForm = z.infer<typeof ruleSchema>;
 
-export function ScheduleRulesTab({ serviceId }: { serviceId: number }) {
+export function ScheduleRulesTab({ serviceId }: { serviceId: string }) {
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ScheduleRule | null>(null);

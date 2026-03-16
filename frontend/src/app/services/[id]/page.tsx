@@ -17,7 +17,7 @@ import { todayAsString } from '@/lib/utils';
 
 export default function ServiceDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const serviceId = Number(id);
+  const serviceId = id as string;
   const today = todayAsString();
 
   const { data: service, isLoading } = useQuery({

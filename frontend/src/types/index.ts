@@ -1,6 +1,6 @@
 // ─── Servicios ───────────────────────────────────────────────────────────────
 export interface Service {
-  id: number;
+  id: string;
   name: string;
   description: string | null;
   timezone: string;
@@ -23,7 +23,7 @@ export type UpdateServiceDto = Partial<CreateServiceDto>;
 // ─── Reglas semanales ────────────────────────────────────────────────────────
 export interface ScheduleRule {
   id: number;
-  serviceId: number;
+  serviceId: string;
   dayOfWeek: number; // 1=Lunes … 7=Domingo
   startTime: string; // HH:MM
   endTime: string;
@@ -48,7 +48,7 @@ export type UpdateScheduleRuleDto = Partial<CreateScheduleRuleDto>;
 // ─── Bloques con capacidad ───────────────────────────────────────────────────
 export interface ScheduleBlock {
   id: number;
-  serviceId: number;
+  serviceId: string;
   dayOfWeek: number;
   startTime: string;
   endTime: string;
@@ -71,7 +71,7 @@ export type UpdateScheduleBlockDto = Partial<CreateScheduleBlockDto>;
 // ─── Excepciones ─────────────────────────────────────────────────────────────
 export interface ServiceException {
   id: number;
-  serviceId: number;
+  serviceId: string;
   exceptionDate: string; // YYYY-MM-DD
   startTime: string | null;
   endTime: string | null;
@@ -112,7 +112,7 @@ export type ReservationStatus = 'confirmed' | 'pending' | 'cancelled';
 
 export interface Reservation {
   id: number;
-  serviceId: number;
+  serviceId: string;
   slotStart: string;
   slotEnd: string;
   status: ReservationStatus;
@@ -124,7 +124,7 @@ export interface Reservation {
 }
 
 export interface CreateReservationDto {
-  service_id: number;
+  service_id: string;
   slot_start: string;
   customer_name?: string;
   customer_external_id?: string;

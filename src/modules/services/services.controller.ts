@@ -6,7 +6,6 @@ import {
   HttpCode,
   HttpStatus,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
 } from '@nestjs/common';
@@ -45,21 +44,21 @@ export class ServicesController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener detalle de un servicio' })
-  @ApiParam({ name: 'id', type: Number })
+  @ApiParam({ name: 'id', type: String })
   @ApiResponse({ status: 200, type: Service })
   @ApiResponse({ status: 404, description: 'Servicio no encontrado' })
-  findOne(@Param('id', ParseIntPipe) id: number): Promise<Service> {
+  findOne(@Param('id') id: string): Promise<Service> {
     return this.servicesService.findOne(id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Actualizar un servicio' })
-  @ApiParam({ name: 'id', type: Number })
+  @ApiParam({ name: 'id', type: String })
   @ApiBody({ type: UpdateServiceDto })
   @ApiResponse({ status: 200, type: Service })
   @ApiResponse({ status: 404, description: 'Servicio no encontrado' })
   update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Body() dto: UpdateServiceDto,
   ): Promise<Service> {
     return this.servicesService.update(id, dto);
@@ -68,11 +67,11 @@ export class ServicesController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Eliminar un servicio (debe estar inactivo)' })
-  @ApiParam({ name: 'id', type: Number })
+  @ApiParam({ name: 'id', type: String })
   @ApiResponse({ status: 204, description: 'Servicio eliminado' })
   @ApiResponse({ status: 400, description: 'El servicio debe estar inactivo' })
   @ApiResponse({ status: 404, description: 'Servicio no encontrado' })
-  remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+  remove(@Param('id') id: string): Promise<void> {
     return this.servicesService.remove(id);
   }
 }

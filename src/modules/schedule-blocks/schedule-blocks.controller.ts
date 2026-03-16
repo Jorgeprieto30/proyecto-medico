@@ -27,13 +27,13 @@ export class ScheduleBlocksController {
 
   @Post('services/:serviceId/schedule-blocks')
   @ApiOperation({ summary: 'Crear un tramo horario con capacidad para un servicio' })
-  @ApiParam({ name: 'serviceId', type: Number })
+  @ApiParam({ name: 'serviceId', type: String })
   @ApiBody({ type: CreateScheduleBlockDto })
   @ApiResponse({ status: 201, type: ScheduleBlock })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
   @ApiResponse({ status: 404, description: 'Servicio no encontrado' })
   create(
-    @Param('serviceId', ParseIntPipe) serviceId: number,
+    @Param('serviceId') serviceId: string,
     @Body() dto: CreateScheduleBlockDto,
   ): Promise<ScheduleBlock> {
     return this.blocksService.create(serviceId, dto);
@@ -41,10 +41,10 @@ export class ScheduleBlocksController {
 
   @Get('services/:serviceId/schedule-blocks')
   @ApiOperation({ summary: 'Listar tramos horarios con capacidad de un servicio' })
-  @ApiParam({ name: 'serviceId', type: Number })
+  @ApiParam({ name: 'serviceId', type: String })
   @ApiResponse({ status: 200, type: [ScheduleBlock] })
   findAll(
-    @Param('serviceId', ParseIntPipe) serviceId: number,
+    @Param('serviceId') serviceId: string,
   ): Promise<ScheduleBlock[]> {
     return this.blocksService.findAllByService(serviceId);
   }

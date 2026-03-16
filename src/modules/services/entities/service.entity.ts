@@ -10,9 +10,9 @@ import { ApiProperty } from '@nestjs/swagger';
 
 @Entity('services')
 export class Service {
-  @ApiProperty({ example: 1 })
-  @PrimaryGeneratedColumn()
-  id: number;
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
   @ApiProperty({ example: 'Consulta Médica General' })
   @Column({ length: 255 })

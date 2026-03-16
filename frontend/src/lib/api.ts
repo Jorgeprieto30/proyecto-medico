@@ -52,20 +52,20 @@ async function request<T>(
 // ─── Services ────────────────────────────────────────────────────────────────
 export const servicesApi = {
   list: () => request<Service[]>('/services'),
-  get: (id: number) => request<Service>(`/services/${id}`),
+  get: (id: string) => request<Service>(`/services/${id}`),
   create: (dto: CreateServiceDto) =>
     request<Service>('/services', { method: 'POST', body: JSON.stringify(dto) }),
-  update: (id: number, dto: UpdateServiceDto) =>
+  update: (id: string, dto: UpdateServiceDto) =>
     request<Service>(`/services/${id}`, { method: 'PATCH', body: JSON.stringify(dto) }),
-  delete: (id: number) =>
+  delete: (id: string) =>
     request<void>(`/services/${id}`, { method: 'DELETE' }),
 };
 
 // ─── Schedule Rules ───────────────────────────────────────────────────────────
 export const rulesApi = {
-  list: (serviceId: number) =>
+  list: (serviceId: string) =>
     request<ScheduleRule[]>(`/services/${serviceId}/schedule-rules`),
-  create: (serviceId: number, dto: CreateScheduleRuleDto) =>
+  create: (serviceId: string, dto: CreateScheduleRuleDto) =>
     request<ScheduleRule>(`/services/${serviceId}/schedule-rules`, {
       method: 'POST',
       body: JSON.stringify(dto),
@@ -81,9 +81,9 @@ export const rulesApi = {
 
 // ─── Schedule Blocks ──────────────────────────────────────────────────────────
 export const blocksApi = {
-  list: (serviceId: number) =>
+  list: (serviceId: string) =>
     request<ScheduleBlock[]>(`/services/${serviceId}/schedule-blocks`),
-  create: (serviceId: number, dto: CreateScheduleBlockDto) =>
+  create: (serviceId: string, dto: CreateScheduleBlockDto) =>
     request<ScheduleBlock>(`/services/${serviceId}/schedule-blocks`, {
       method: 'POST',
       body: JSON.stringify(dto),
@@ -99,9 +99,9 @@ export const blocksApi = {
 
 // ─── Exceptions ───────────────────────────────────────────────────────────────
 export const exceptionsApi = {
-  list: (serviceId: number) =>
+  list: (serviceId: string) =>
     request<ServiceException[]>(`/services/${serviceId}/exceptions`),
-  create: (serviceId: number, dto: CreateExceptionDto) =>
+  create: (serviceId: string, dto: CreateExceptionDto) =>
     request<ServiceException>(`/services/${serviceId}/exceptions`, {
       method: 'POST',
       body: JSON.stringify(dto),
@@ -117,11 +117,11 @@ export const exceptionsApi = {
 
 // ─── Availability ─────────────────────────────────────────────────────────────
 export const availabilityApi = {
-  byDate: (serviceId: number, date: string) =>
+  byDate: (serviceId: string, date: string) =>
     request<SlotAvailability[]>(
       `/availability?service_id=${serviceId}&date=${date}`,
     ),
-  bySlot: (serviceId: number, datetime: string) =>
+  bySlot: (serviceId: string, datetime: string) =>
     request<SlotDetail>(
       `/availability/slot?service_id=${serviceId}&datetime=${encodeURIComponent(datetime)}`,
     ),
@@ -129,9 +129,9 @@ export const availabilityApi = {
 
 // ─── Reservations ─────────────────────────────────────────────────────────────
 export const reservationsApi = {
-  list: (opts: { service_id?: number; date?: string; status?: string } = {}) => {
+  list: (opts: { service_id?: string; date?: string; status?: string } = {}) => {
     const params = new URLSearchParams();
-    if (opts.service_id) params.set('service_id', String(opts.service_id));
+    if (opts.service_id) params.set('service_id', opts.service_id);
     if (opts.date) params.set('date', opts.date);
     if (opts.status) params.set('status', opts.status);
     return request<Reservation[]>(`/reservations?${params}`);

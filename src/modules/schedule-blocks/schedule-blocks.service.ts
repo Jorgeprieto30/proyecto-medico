@@ -18,7 +18,7 @@ export class ScheduleBlocksService {
     private readonly servicesService: ServicesService,
   ) {}
 
-  async create(serviceId: number, dto: CreateScheduleBlockDto): Promise<ScheduleBlock> {
+  async create(serviceId: string, dto: CreateScheduleBlockDto): Promise<ScheduleBlock> {
     await this.servicesService.findOne(serviceId);
 
     if (dto.startTime >= dto.endTime) {
@@ -33,7 +33,7 @@ export class ScheduleBlocksService {
     return this.blockRepo.save(block);
   }
 
-  async findAllByService(serviceId: number): Promise<ScheduleBlock[]> {
+  async findAllByService(serviceId: string): Promise<ScheduleBlock[]> {
     await this.servicesService.findOne(serviceId);
     return this.blockRepo.find({
       where: { serviceId },
@@ -71,7 +71,7 @@ export class ScheduleBlocksService {
 
   /** Uso interno: obtener bloques activos de un servicio para un día de semana */
   async findActiveByServiceAndDay(
-    serviceId: number,
+    serviceId: string,
     dayOfWeek: number,
   ): Promise<ScheduleBlock[]> {
     return this.blockRepo.find({
