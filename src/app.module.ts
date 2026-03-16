@@ -6,10 +6,12 @@ import { ScheduleBlocksModule } from './modules/schedule-blocks/schedule-blocks.
 import { ExceptionsModule } from './modules/exceptions/exceptions.module';
 import { AvailabilityModule } from './modules/availability/availability.module';
 import { ReservationsModule } from './modules/reservations/reservations.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
     DatabaseModule,
+    AuthModule,
     ServicesModule,
     ScheduleRulesModule,
     ScheduleBlocksModule,

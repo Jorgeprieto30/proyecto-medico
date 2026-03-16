@@ -1,3 +1,4 @@
+import { getSession } from 'next-auth/react';
 import type {
   ApiResponse,
   Service, CreateServiceDto, UpdateServiceDto,
@@ -24,8 +25,14 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
+  const session = await getSession();
+  const token = (session as any)?.accessToken;
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
     ...options,
   });
 
