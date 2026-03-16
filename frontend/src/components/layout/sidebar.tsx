@@ -8,6 +8,7 @@ import {
   CalendarDays,
   ClipboardList,
   Dumbbell,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   Settings2,
@@ -21,6 +22,7 @@ const navItems = [
   { href: '/reservations', label: 'Reservas', icon: ClipboardList },
   { href: '/services', label: 'Servicios', icon: Settings2 },
   { href: '/api-docs', label: 'API Docs', icon: BookOpen },
+  { href: '/settings', label: 'Configuración', icon: KeyRound },
 ];
 
 export function Sidebar() {

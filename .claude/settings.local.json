@@ -12,7 +12,8 @@
       "Bash(docker -H unix:///var/run/docker.sock ps)",
       "Bash(docker -H unix:///Users/jprietoleighton/.docker/run/docker.sock ps)",
       "Bash(ls /Users/jprietoleighton/code/Jorgeprieto30/proyecto_medico/frontend/.env*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)"
     ]
   }
 }
