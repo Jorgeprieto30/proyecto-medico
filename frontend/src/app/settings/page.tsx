@@ -216,7 +216,7 @@ export default function SettingsPage() {
           </p>
           <pre className="bg-gray-900 text-green-400 rounded-lg px-4 py-3 text-xs font-mono overflow-x-auto">
 {`curl https://proyecto-medico-production-dc07.up.railway.app/api/v1/services \\
-  -H "Authorization: Bearer ak_tu_clave_aqui"`}
+  -H "X-Api-Key: ak_tu_clave_aqui"`}
           </pre>
         </CardContent>
       </Card>

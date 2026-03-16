@@ -24,11 +24,14 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     const request = context.switchToHttp().getRequest();
     const authHeader: string = request.headers['authorization'] ?? '';
 
-    // Si el token empieza con ak_ es una API key, no un JWT
-    if (authHeader.startsWith('Bearer ak_')) {
-      const raw = authHeader.slice(7);
+    // Soportar X-Api-Key header (estándar para integraciones externas)
+    const xApiKey: string = request.headers['x-api-key'] ?? '';
+    const bearerApiKey = authHeader.startsWith('Bearer ak_') ? authHeader.slice(7) : '';
+    const rawKey = xApiKey || bearerApiKey;
+
+    if (rawKey.startsWith('ak_')) {
       const apiKeysService = this.moduleRef.get(ApiKeysService, { strict: false });
-      const apiKey = await apiKeysService.validateKey(raw);
+      const apiKey = await apiKeysService.validateKey(rawKey);
       if (!apiKey) return false;
       request.user = apiKey.user;
       return true;

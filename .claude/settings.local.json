@@ -13,7 +13,10 @@
       "Bash(docker -H unix:///Users/jprietoleighton/.docker/run/docker.sock ps)",
       "Bash(ls /Users/jprietoleighton/code/Jorgeprieto30/proyecto_medico/frontend/.env*)",
       "Bash(git add:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(BASE=\"https://proyecto-medico-production-dc07.up.railway.app/api/v1\" __NEW_LINE_8a52db65c0491fd2__ echo \"=== 1. Register ===\" curl -s -X POST \"$BASE/auth/register\" -H \"Content-Type: application/json\" -d '{\"\"\"\"name\"\"\"\":\"\"\"\"Test User\"\"\"\",\"\"\"\"email\"\"\"\":\"\"\"\"test_check@test.com\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"test123\"\"\"\"}')",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://proyecto-medico-one.vercel.app/settings)"
     ]
   }
 }

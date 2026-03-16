@@ -28,7 +28,7 @@ interface Section {
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
-const API_BASE = 'http://localhost:3000/api/v1';
+const API_BASE = 'https://proyecto-medico-production-dc07.up.railway.app/api/v1';
 
 const SECTIONS: Section[] = [
   {
@@ -400,7 +400,7 @@ export default function ApiDocsPage() {
           </p>
         </div>
         <a
-          href="http://localhost:3000/api/docs"
+          href="https://proyecto-medico-production-dc07.up.railway.app/api/docs"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 border border-blue-200 rounded-lg px-3 py-2 hover:bg-blue-50 transition-colors"
@@ -416,13 +416,48 @@ export default function ApiDocsPage() {
           { label: 'Respuestas', value: 'Wrapeadas en { data }' },
           { label: 'Errores', value: '{ statusCode, error, message }' },
           { label: 'Fechas', value: 'UTC (timestamptz)' },
-          { label: 'Auth', value: 'Sin autenticación (MVP)' },
+          { label: 'Auth', value: 'X-Api-Key requerida' },
         ].map((item) => (
           <div key={item.label} className="border rounded-lg p-3">
             <p className="text-xs text-gray-500">{item.label}</p>
             <p className="text-sm font-medium text-gray-900 mt-0.5">{item.value}</p>
           </div>
         ))}
+      </div>
+
+      {/* Auth section */}
+      <div className="border border-amber-200 bg-amber-50 rounded-xl p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <span className="text-amber-600 font-semibold text-sm uppercase tracking-wide">🔑 Autenticación</span>
+        </div>
+        <p className="text-sm text-amber-900">
+          Todos los endpoints requieren autenticación. Genera tu API key en{' '}
+          <strong>Configuración → API Keys</strong> del panel admin. Cada clave identifica tu plataforma o integración.
+        </p>
+        <div className="space-y-3">
+          <div>
+            <p className="text-xs font-semibold text-amber-800 mb-1.5">Opción 1 — Header X-Api-Key (recomendado para integraciones)</p>
+            <pre className="bg-gray-900 text-green-400 rounded-lg px-4 py-3 text-xs font-mono overflow-x-auto">{`curl ${API_BASE}/services \\
+  -H "X-Api-Key: ak_tu_clave_aqui"`}</pre>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-amber-800 mb-1.5">Opción 2 — Bearer token (también válido)</p>
+            <pre className="bg-gray-900 text-green-400 rounded-lg px-4 py-3 text-xs font-mono overflow-x-auto">{`curl ${API_BASE}/services \\
+  -H "Authorization: Bearer ak_tu_clave_aqui"`}</pre>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          {[
+            { code: '401', desc: 'Sin clave o clave inválida' },
+            { code: '403', desc: 'Clave revocada' },
+            { code: '200', desc: 'Autenticado correctamente' },
+          ].map((r) => (
+            <div key={r.code} className="bg-white border border-amber-100 rounded-lg px-3 py-2">
+              <span className="font-mono text-xs font-bold text-amber-700">{r.code}</span>
+              <p className="text-xs text-gray-600 mt-0.5">{r.desc}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Notes */}
