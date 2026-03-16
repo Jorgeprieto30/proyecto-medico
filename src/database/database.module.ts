@@ -7,11 +7,14 @@ import * as path from 'path';
     TypeOrmModule.forRootAsync({
       useFactory: () => ({
         type: 'postgres',
+        // Railway provee DATABASE_URL automáticamente; usarlo si está disponible
+        url: process.env.DATABASE_URL,
         host: process.env.DB_HOST || 'localhost',
         port: parseInt(process.env.DB_PORT || '5432', 10),
         username: process.env.DB_USERNAME || 'agenda_user',
         password: process.env.DB_PASSWORD || 'agenda_pass',
         database: process.env.DB_DATABASE || 'agenda_cupos',
+        ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
         entities: [
           path.join(__dirname, '..', 'modules', '**', 'entities', '*.entity.{ts,js}'),
         ],
