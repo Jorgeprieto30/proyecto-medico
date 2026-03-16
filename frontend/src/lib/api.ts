@@ -57,6 +57,8 @@ export const servicesApi = {
     request<Service>('/services', { method: 'POST', body: JSON.stringify(dto) }),
   update: (id: number, dto: UpdateServiceDto) =>
     request<Service>(`/services/${id}`, { method: 'PATCH', body: JSON.stringify(dto) }),
+  delete: (id: number) =>
+    request<void>(`/services/${id}`, { method: 'DELETE' }),
 };
 
 // ─── Schedule Rules ───────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, Pencil, Eye } from 'lucide-react';
+import { Plus, Pencil, Eye, Trash2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -11,12 +11,13 @@ import Link from 'next/link';
 
 import { servicesApi } from '@/lib/api';
 import type { Service } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { PageSpinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 
@@ -42,6 +43,7 @@ export default function ServicesPage() {
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Service | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
 
   const { data: services, isLoading } = useQuery({
     queryKey: ['services'],
@@ -71,7 +73,7 @@ export default function ServicesPage() {
     setModalOpen(true);
   };
 
-  const mutation = useMutation({
+  const saveMutation = useMutation({
     mutationFn: (data: ServiceForm) =>
       editing
         ? servicesApi.update(editing.id, data)
@@ -82,6 +84,29 @@ export default function ServicesPage() {
       setModalOpen(false);
     },
     onError: (e: Error) => toast.error(e.message),
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: (s: Service) =>
+      servicesApi.update(s.id, { isActive: !s.isActive }),
+    onSuccess: (updated) => {
+      qc.invalidateQueries({ queryKey: ['services'] });
+      toast.success(updated.isActive ? 'Servicio activado' : 'Servicio desactivado');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => servicesApi.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['services'] });
+      toast.success('Servicio eliminado');
+      setDeleteId(null);
+    },
+    onError: (e: Error) => {
+      toast.error(e.message);
+      setDeleteId(null);
+    },
   });
 
   if (isLoading) return <PageSpinner />;
@@ -111,7 +136,7 @@ export default function ServicesPage() {
             <table className="w-full text-sm">
               <thead className="border-b bg-gray-50">
                 <tr>
-                  {['ID', 'Nombre', 'Zona horaria', 'Bloque (min)', 'Estado', 'Acciones'].map((h) => (
+                  {['ID', 'Nombre', 'Zona horaria', 'Bloque (min)', 'Activo', 'Acciones'].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-medium text-gray-600">{h}</th>
                   ))}
                 </tr>
@@ -129,9 +154,22 @@ export default function ServicesPage() {
                     <td className="px-4 py-3 text-gray-600">{s.timezone}</td>
                     <td className="px-4 py-3 text-gray-600">{s.slotDurationMinutes}</td>
                     <td className="px-4 py-3">
-                      <Badge variant={s.isActive ? 'success' : 'muted'}>
-                        {s.isActive ? 'Activo' : 'Inactivo'}
-                      </Badge>
+                      {/* Toggle switch */}
+                      <button
+                        role="switch"
+                        aria-checked={s.isActive}
+                        onClick={() => toggleMutation.mutate(s)}
+                        disabled={toggleMutation.isPending}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 disabled:opacity-50 ${
+                          s.isActive ? 'bg-blue-600' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                            s.isActive ? 'translate-x-4' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -145,6 +183,15 @@ export default function ServicesPage() {
                             Detalle
                           </Link>
                         </Button>
+                        {!s.isActive && (
+                          <button
+                            onClick={() => setDeleteId(s.id)}
+                            className="text-red-400 hover:text-red-600 transition-colors p-1"
+                            title="Eliminar servicio"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -161,7 +208,7 @@ export default function ServicesPage() {
         onClose={() => setModalOpen(false)}
         title={editing ? 'Editar servicio' : 'Nuevo servicio'}
       >
-        <form onSubmit={handleSubmit((d) => mutation.mutate(d))} className="space-y-4">
+        <form onSubmit={handleSubmit((d) => saveMutation.mutate(d))} className="space-y-4">
           <div>
             <Label htmlFor="name">Nombre *</Label>
             <Input id="name" {...register('name')} className="mt-1" placeholder="Clase de Spinning" />
@@ -209,12 +256,23 @@ export default function ServicesPage() {
             <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Guardando...' : editing ? 'Guardar cambios' : 'Crear servicio'}
+            <Button type="submit" disabled={saveMutation.isPending}>
+              {saveMutation.isPending ? 'Guardando...' : editing ? 'Guardar cambios' : 'Crear servicio'}
             </Button>
           </div>
         </form>
       </Modal>
+
+      {/* Confirm eliminar */}
+      <ConfirmDialog
+        open={!!deleteId}
+        title="Eliminar servicio"
+        description="Esta acción es permanente. Se eliminará el servicio y toda su configuración de horarios. Las reservas existentes no se verán afectadas."
+        confirmLabel="Eliminar"
+        variant="destructive"
+        onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
+        onClose={() => setDeleteId(null)}
+      />
     </div>
   );
 }

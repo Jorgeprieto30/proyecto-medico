@@ -1,7 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseIntPipe,
   Patch,
@@ -60,5 +63,16 @@ export class ServicesController {
     @Body() dto: UpdateServiceDto,
   ): Promise<Service> {
     return this.servicesService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Eliminar un servicio (debe estar inactivo)' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 204, description: 'Servicio eliminado' })
+  @ApiResponse({ status: 400, description: 'El servicio debe estar inactivo' })
+  @ApiResponse({ status: 404, description: 'Servicio no encontrado' })
+  remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    return this.servicesService.remove(id);
   }
 }

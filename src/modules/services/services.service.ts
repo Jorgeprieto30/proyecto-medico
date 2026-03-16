@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -39,5 +40,15 @@ export class ServicesService {
     const service = await this.findOne(id);
     Object.assign(service, dto);
     return this.serviceRepo.save(service);
+  }
+
+  async remove(id: number): Promise<void> {
+    const service = await this.findOne(id);
+    if (service.isActive) {
+      throw new BadRequestException(
+        'Desactiva el servicio antes de eliminarlo',
+      );
+    }
+    await this.serviceRepo.delete(id);
   }
 }
