@@ -30,9 +30,9 @@ export function Sidebar() {
   const { data: session } = useSession();
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-50 w-60 bg-gray-900 flex flex-col">
+    <aside className="fixed inset-y-0 left-0 z-50 w-60 bg-[#0d1526] flex flex-col">
       {/* Logo */}
-      <div className="flex items-center gap-2 px-6 py-5 border-b border-gray-700">
+      <div className="flex items-center gap-2 px-6 py-5 border-b border-[#1e3052]">
         <CalendarDays className="h-6 w-6 text-blue-400" />
         <span className="text-white font-semibold text-base leading-tight">
           Agenda<br />
@@ -53,7 +53,7 @@ export function Sidebar() {
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
                 active
                   ? 'bg-blue-600 text-white'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800',
+                  : 'text-slate-400 hover:text-white hover:bg-[#1a2a45]',
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />
@@ -64,7 +64,7 @@ export function Sidebar() {
       </nav>
 
       {/* User + Logout */}
-      <div className="px-3 py-4 border-t border-gray-700">
+      <div className="px-3 py-4 border-t border-[#1e3052]">
         {session?.user && (
           <div className="flex items-center gap-3 px-3 py-2 mb-2">
             {session.user.image ? (
@@ -80,13 +80,13 @@ export function Sidebar() {
             )}
             <div className="min-w-0">
               <p className="text-xs font-medium text-white truncate">{session.user.name}</p>
-              <p className="text-xs text-gray-500 truncate">{session.user.email}</p>
+              <p className="text-xs text-slate-400 truncate">{session.user.email}</p>
             </div>
           </div>
         )}
         <button
           onClick={() => signOut({ callbackUrl: '/login' })}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-[#1a2a45] transition-colors"
         >
           <LogOut className="h-4 w-4 shrink-0" />
           Cerrar sesión
