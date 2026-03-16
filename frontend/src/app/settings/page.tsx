@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, Trash2, Copy, Eye, EyeOff, KeyRound, CheckCircle2 } from 'lucide-react';
+import { Plus, Trash2, Copy, Check, KeyRound } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -39,6 +39,7 @@ interface ApiKey {
   id: string;
   name: string;
   prefix: string;
+  key_value: string | null;
   is_active: boolean;
   last_used_at: string | null;
   created_at: string;
@@ -49,11 +50,29 @@ const schema = z.object({
 });
 type FormData = z.infer<typeof schema>;
 
+function CopyButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    await navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <button
+      onClick={copy}
+      className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+      title="Copiar"
+    >
+      {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+    </button>
+  );
+}
+
 export default function SettingsPage() {
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
-  const [newKey, setNewKey] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [revokeId, setRevokeId] = useState<string | null>(null);
 
   const { data: keys, isLoading } = useQuery<ApiKey[]>({
@@ -68,11 +87,11 @@ export default function SettingsPage() {
   const createMutation = useMutation({
     mutationFn: (data: FormData) =>
       apiFetch('/api-keys', { method: 'POST', body: JSON.stringify(data) }),
-    onSuccess: (data) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['api-keys'] });
-      setNewKey(data.key);
       setModalOpen(false);
       reset();
+      toast.success('API key creada');
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -87,13 +106,6 @@ export default function SettingsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const copyKey = async () => {
-    if (!newKey) return;
-    await navigator.clipboard.writeText(newKey);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   if (isLoading) return <PageSpinner />;
 
   return (
@@ -102,39 +114,6 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Configuración</h1>
         <p className="text-gray-500 text-sm mt-1">Administra las claves de acceso a la API</p>
       </div>
-
-      {/* Clave recién creada — mostrar una sola vez */}
-      {newKey && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-5">
-          <div className="flex items-start gap-3">
-            <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-green-800">API key creada — guárdala ahora</p>
-              <p className="text-xs text-green-700 mt-0.5 mb-3">
-                Esta es la única vez que se mostrará. No la podrás ver de nuevo.
-              </p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 bg-white border border-green-200 rounded-lg px-3 py-2 text-sm font-mono text-gray-800 truncate">
-                  {newKey}
-                </code>
-                <button
-                  onClick={copyKey}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors shrink-0"
-                >
-                  {copied ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                  {copied ? 'Copiado' : 'Copiar'}
-                </button>
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={() => setNewKey(null)}
-            className="mt-3 text-xs text-green-700 hover:underline"
-          >
-            Ya la guardé, cerrar
-          </button>
-        </div>
-      )}
 
       {/* Sección API Keys */}
       <Card>
@@ -157,7 +136,7 @@ export default function SettingsPage() {
             <table className="w-full text-sm">
               <thead className="border-t border-b bg-gray-50">
                 <tr>
-                  {['Nombre', 'Prefijo', 'Estado', 'Último uso', 'Creada', ''].map((h) => (
+                  {['Nombre', 'Clave', 'Estado', 'Último uso', 'Creada', ''].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">
                       {h}
                     </th>
@@ -169,9 +148,12 @@ export default function SettingsPage() {
                   <tr key={k.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">{k.name}</td>
                     <td className="px-4 py-3">
-                      <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono text-gray-600">
-                        {k.prefix}…
-                      </code>
+                      <div className="flex items-center gap-1">
+                        <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono text-gray-700 max-w-[220px] truncate block">
+                          {k.key_value ?? `${k.prefix}…`}
+                        </code>
+                        {k.key_value && <CopyButton value={k.key_value} />}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={k.is_active ? 'success' : 'muted'}>
@@ -212,7 +194,7 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-gray-600">
-            Incluye la clave en el header <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">Authorization</code> de cada request:
+            Incluye la clave en el header <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">X-Api-Key</code> de cada request:
           </p>
           <pre className="bg-gray-900 text-green-400 rounded-lg px-4 py-3 text-xs font-mono overflow-x-auto">
 {`curl https://proyecto-medico-production-dc07.up.railway.app/api/v1/services \\

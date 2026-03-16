@@ -24,6 +24,10 @@ export class ApiKey {
   @Column({ select: false })
   key_hash: string;
 
+  // Clave completa (para mostrarla en el panel)
+  @Column({ nullable: true })
+  key_value: string;
+
   @Column({ default: true })
   is_active: boolean;
 

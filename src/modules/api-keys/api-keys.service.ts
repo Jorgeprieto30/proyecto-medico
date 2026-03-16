@@ -21,11 +21,11 @@ export class ApiKeysService {
       name: dto.name,
       prefix,
       key_hash,
+      key_value: raw,
       user_id: userId,
     });
     await this.repo.save(entity);
 
-    // Devolvemos la clave completa UNA sola vez
     return { ...entity, key: raw };
   }
 
