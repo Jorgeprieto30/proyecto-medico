@@ -31,11 +31,30 @@ export function Sidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-50 w-60 bg-[#0d1526] flex flex-col">
       {/* Logo */}
-      <div className="flex items-center gap-2 px-6 py-5 border-b border-[#1e3052]">
-        <CalendarDays className="h-6 w-6 text-blue-400" />
-        <span className="text-white font-semibold text-base leading-tight">
-          Agenda<br />
-          <span className="text-blue-400 font-bold">Admin</span>
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-[#1e3052]">
+        {/* Mini campus calendar icon */}
+        <div className="relative w-9 h-9 shrink-0">
+          <div className="absolute bottom-0 right-0 w-7 h-7 rounded-lg bg-blue-400/30 border border-blue-400/50" />
+          <div className="absolute top-0 left-0 w-7 h-7 bg-white rounded-lg shadow flex flex-col items-center justify-center gap-0.5">
+            <div className="flex gap-0.5 -mt-1">
+              {[0,1,2].map(i => <div key={i} className="w-0.5 h-1.5 bg-blue-400 rounded-full" />)}
+            </div>
+            <div className="grid grid-cols-3 gap-0.5">
+              {[...Array(6)].map((_,i) => <div key={i} className="w-1 h-1 bg-gray-200 rounded-sm" />)}
+            </div>
+          </div>
+        </div>
+        {/* "campus" wordmark */}
+        <span
+          className="text-xl font-bold tracking-tight leading-none"
+          style={{
+            background: 'linear-gradient(90deg, #60b0e8 0%, #5ec9bc 60%, #c0aa94 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}
+        >
+          campus
         </span>
       </div>
 
