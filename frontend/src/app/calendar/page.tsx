@@ -304,7 +304,7 @@ export default function CalendarPage() {
               onChange={(e) => setFilterServiceId(e.target.value)}
               className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             >
-              <option value="">Todas las clases</option>
+              <option value="">Todos los eventos</option>
               {services.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
@@ -411,7 +411,7 @@ function DayView({
 
           {laid.length === 0 ? (
             <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-400">
-              Sin clases para este día
+              Sin eventos para este día
             </div>
           ) : (
             laid.map((slot, idx) => {

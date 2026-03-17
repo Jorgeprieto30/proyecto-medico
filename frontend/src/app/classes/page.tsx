@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -32,42 +32,44 @@ const TIMEZONES = [
 
 const DAY_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
 
-const classSchema = z.object({
-  name: z.string().min(1, 'Nombre requerido'),
-  description: z.string().optional(),
-  timezone: z.string().min(1, 'Timezone requerido'),
-  slotDurationMinutes: z.coerce.number().min(5).max(480),
-  capacity: z.coerce.number().min(1, 'Mínimo 1 cupo'),
-  days: z.array(z.number()).min(1, 'Selecciona al menos un día'),
+const timeSlotSchema = z.object({
   startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Formato HH:MM'),
-  endTime: z.string().regex(/^\d{2}:\d{2}$/, 'Formato HH:MM'),
-  validFrom: z.string().optional(),
-  validUntil: z.string().optional(),
+  endTime:   z.string().regex(/^\d{2}:\d{2}$/, 'Formato HH:MM'),
+  capacity:  z.coerce.number().min(1, 'Mínimo 1'),
 });
-type ClassForm = z.infer<typeof classSchema>;
 
-const DEFAULT_VALUES: ClassForm = {
-  name: '',
-  description: '',
-  timezone: 'America/Santiago',
+const eventSchema = z.object({
+  name:                z.string().min(1, 'Nombre requerido'),
+  description:         z.string().optional(),
+  timezone:            z.string().min(1, 'Timezone requerido'),
+  slotDurationMinutes: z.coerce.number().min(5).max(480),
+  days:                z.array(z.number()).min(1, 'Selecciona al menos un día'),
+  timeSlots:           z.array(timeSlotSchema).min(1, 'Agrega al menos un horario'),
+  validFrom:           z.string().optional(),
+  validUntil:          z.string().optional(),
+});
+type EventForm = z.infer<typeof eventSchema>;
+
+const DEFAULT_VALUES: EventForm = {
+  name:                '',
+  description:         '',
+  timezone:            'America/Santiago',
   slotDurationMinutes: 60,
-  capacity: 5,
-  days: [],
-  startTime: '08:00',
-  endTime: '09:00',
-  validFrom: todayAsString(),
-  validUntil: '',
+  days:                [],
+  timeSlots:           [{ startTime: '08:00', endTime: '09:00', capacity: 5 }],
+  validFrom:           todayAsString(),
+  validUntil:          '',
 };
 
-export default function ClassesPage() {
+export default function EventosPage() {
   const qc = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Service | null>(null);
-  const [deleting, setDeleting] = useState<Service | null>(null);
+  const [editing, setEditing]     = useState<Service | null>(null);
+  const [deleting, setDeleting]   = useState<Service | null>(null);
 
   const { data: services, isLoading } = useQuery({
     queryKey: ['services'],
-    queryFn: servicesApi.list,
+    queryFn:  servicesApi.list,
   });
 
   const {
@@ -77,9 +79,14 @@ export default function ClassesPage() {
     control,
     watch,
     formState: { errors },
-  } = useForm<ClassForm>({
-    resolver: zodResolver(classSchema),
+  } = useForm<EventForm>({
+    resolver:      zodResolver(eventSchema),
     defaultValues: DEFAULT_VALUES,
+  });
+
+  const { fields: slotFields, append: appendSlot, remove: removeSlot } = useFieldArray({
+    control,
+    name: 'timeSlots',
   });
 
   const selectedDays = watch('days');
@@ -92,59 +99,57 @@ export default function ClassesPage() {
 
   const openEdit = (svc: Service) => {
     reset({
-      name: svc.name,
-      description: svc.description ?? '',
-      timezone: svc.timezone,
+      name:                svc.name,
+      description:         svc.description ?? '',
+      timezone:            svc.timezone,
       slotDurationMinutes: svc.slotDurationMinutes,
-      capacity: 5,
-      days: [],
-      startTime: '08:00',
-      endTime: '09:00',
-      validFrom: todayAsString(),
-      validUntil: '',
+      days:                [],
+      timeSlots:           [{ startTime: '08:00', endTime: '09:00', capacity: 5 }],
+      validFrom:           todayAsString(),
+      validUntil:          '',
     });
     setEditing(svc);
     setModalOpen(true);
   };
 
   const saveMutation = useMutation({
-    mutationFn: async (data: ClassForm) => {
+    mutationFn: async (data: EventForm) => {
       let serviceId: string;
 
       if (editing) {
-        // Update service basic info
         await servicesApi.update(editing.id, {
-          name: data.name,
-          description: data.description,
-          timezone: data.timezone,
+          name:                data.name,
+          description:         data.description,
+          timezone:            data.timezone,
           slotDurationMinutes: data.slotDurationMinutes,
         });
         serviceId = editing.id;
       } else {
-        // 1. Create service
         const svc = await servicesApi.create({
-          name: data.name,
-          description: data.description,
-          timezone: data.timezone,
+          name:                data.name,
+          description:         data.description,
+          timezone:            data.timezone,
           slotDurationMinutes: data.slotDurationMinutes,
         });
         serviceId = svc.id;
 
-        // 2. Create schedule rules + blocks for each selected day
+        // For each day × each time slot → create rule + block
         for (const day of data.days) {
-          await rulesApi.create(serviceId, {
-            dayOfWeek: day,
-            startTime: data.startTime,
-            endTime: data.endTime,
-            validFrom: data.validFrom || undefined,
-            validUntil: data.validUntil || undefined,
-          });
-          await blocksApi.create(serviceId, {
-            dayOfWeek: day,
-            startTime: data.startTime,
-            endTime: data.endTime,
-            capacity: data.capacity,
-          });
+          for (const slot of data.timeSlots) {
+            await rulesApi.create(serviceId, {
+              dayOfWeek: day,
+              startTime: slot.startTime,
+              endTime:   slot.endTime,
+              validFrom:  data.validFrom || undefined,
+              validUntil: data.validUntil || undefined,
+            });
+            await blocksApi.create(serviceId, {
+              dayOfWeek: day,
+              startTime: slot.startTime,
+              endTime:   slot.endTime,
+              capacity:  slot.capacity,
+            });
+          }
         }
       }
 
@@ -152,19 +157,17 @@ export default function ClassesPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['services'] });
-      toast.success(editing ? 'Clase actualizada' : 'Clase creada exitosamente');
+      toast.success(editing ? 'Evento actualizado' : 'Evento creado exitosamente');
       setModalOpen(false);
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await servicesApi.update(id, { isActive: false });
-    },
+    mutationFn: async (id: string) => servicesApi.update(id, { isActive: false }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['services'] });
-      toast.success('Clase desactivada');
+      toast.success('Evento desactivado');
       setDeleting(null);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -176,32 +179,32 @@ export default function ClassesPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Clases</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Eventos</h1>
           <p className="text-gray-500 text-sm mt-1">
-            Crea y administra los tipos de clase con sus horarios y capacidades.
+            Crea y administra los tipos de evento con sus horarios y capacidades.
           </p>
         </div>
         <Button onClick={openCreate}>
           <Plus className="h-4 w-4" />
-          Nueva clase
+          Nuevo evento
         </Button>
       </div>
 
       {!services?.length ? (
         <EmptyState
-          title="Sin clases"
-          description="Crea tu primera clase configurando su horario, días y capacidad."
+          title="Sin eventos"
+          description="Crea tu primer evento configurando su horario, días y capacidad."
           action={
             <Button onClick={openCreate}>
               <Plus className="h-4 w-4" />
-              Nueva clase
+              Nuevo evento
             </Button>
           }
         />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {services.map((svc) => (
-            <ClassCard
+            <EventCard
               key={svc.id}
               service={svc}
               onEdit={() => openEdit(svc)}
@@ -215,23 +218,20 @@ export default function ClassesPage() {
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editing ? `Editar: ${editing.name}` : 'Nueva clase'}
+        title={editing ? `Editar: ${editing.name}` : 'Nuevo evento'}
         description={
           editing
-            ? 'Modifica los datos básicos de la clase. Para editar horarios usa la pestaña de Horarios.'
-            : 'Configura el nombre, duración, días y capacidad de la nueva clase.'
+            ? 'Modifica los datos básicos del evento. Para editar horarios usa la pestaña de Horarios.'
+            : 'Configura el nombre, duración, días y horarios del nuevo evento.'
         }
         className="max-w-2xl"
       >
-        <form
-          onSubmit={handleSubmit((d) => saveMutation.mutate(d))}
-          className="space-y-5"
-        >
+        <form onSubmit={handleSubmit((d) => saveMutation.mutate(d))} className="space-y-5">
           {/* Basic info */}
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <Label>Nombre de la clase *</Label>
-              <Input {...register('name')} className="mt-1" placeholder="ej: Spinning, Yoga, Pilates" />
+              <Label>Nombre del evento *</Label>
+              <Input {...register('name')} className="mt-1" placeholder="ej: Yoga, Spinning, Pilates" />
               {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name.message}</p>}
             </div>
 
@@ -255,12 +255,9 @@ export default function ClassesPage() {
             <div>
               <Label>Duración del slot (minutos) *</Label>
               <Input
-                type="number"
-                min={5}
-                max={480}
+                type="number" min={5} max={480}
                 {...register('slotDurationMinutes')}
-                className="mt-1"
-                placeholder="60"
+                className="mt-1" placeholder="60"
               />
               {errors.slotDurationMinutes && (
                 <p className="text-xs text-red-500 mt-1">{errors.slotDurationMinutes.message}</p>
@@ -271,7 +268,6 @@ export default function ClassesPage() {
           {!editing && (
             <>
               <hr className="border-gray-100" />
-              <p className="text-sm font-medium text-gray-700">Horario de la clase</p>
 
               {/* Days */}
               <div>
@@ -287,13 +283,13 @@ export default function ClassesPage() {
                           <button
                             key={day}
                             type="button"
-                            onClick={() => {
+                            onClick={() =>
                               field.onChange(
                                 checked
                                   ? field.value.filter((d) => d !== day)
                                   : [...field.value, day],
-                              );
-                            }}
+                              )
+                            }
                             className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                               checked
                                 ? 'bg-blue-600 text-white border-blue-600'
@@ -312,35 +308,78 @@ export default function ClassesPage() {
                 )}
               </div>
 
-              {/* Times */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label>Hora inicio *</Label>
-                  <Input type="time" {...register('startTime')} className="mt-1" />
-                  {errors.startTime && (
-                    <p className="text-xs text-red-500 mt-1">{errors.startTime.message}</p>
-                  )}
+              {/* Time slots */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label>Horarios *</Label>
+                  <button
+                    type="button"
+                    onClick={() => appendSlot({ startTime: '', endTime: '', capacity: 5 })}
+                    className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                  >
+                    <Plus className="h-3 w-3" /> Añadir horario
+                  </button>
                 </div>
-                <div>
-                  <Label>Hora fin *</Label>
-                  <Input type="time" {...register('endTime')} className="mt-1" />
-                  {errors.endTime && (
-                    <p className="text-xs text-red-500 mt-1">{errors.endTime.message}</p>
-                  )}
+
+                <div className="space-y-2">
+                  {slotFields.map((field, idx) => (
+                    <div key={field.id} className="flex items-start gap-2 p-3 border rounded-lg bg-gray-50">
+                      <div className="flex-1 grid grid-cols-3 gap-2">
+                        <div>
+                          <Label className="text-xs text-gray-500">Inicio</Label>
+                          <Input
+                            type="time"
+                            {...register(`timeSlots.${idx}.startTime`)}
+                            className="mt-0.5 h-8 text-sm"
+                          />
+                          {errors.timeSlots?.[idx]?.startTime && (
+                            <p className="text-xs text-red-500">{errors.timeSlots[idx]?.startTime?.message}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-500">Fin</Label>
+                          <Input
+                            type="time"
+                            {...register(`timeSlots.${idx}.endTime`)}
+                            className="mt-0.5 h-8 text-sm"
+                          />
+                          {errors.timeSlots?.[idx]?.endTime && (
+                            <p className="text-xs text-red-500">{errors.timeSlots[idx]?.endTime?.message}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Label className="text-xs text-gray-500">Cupos</Label>
+                          <Input
+                            type="number" min={1}
+                            {...register(`timeSlots.${idx}.capacity`)}
+                            className="mt-0.5 h-8 text-sm"
+                            placeholder="5"
+                          />
+                          {errors.timeSlots?.[idx]?.capacity && (
+                            <p className="text-xs text-red-500">{errors.timeSlots[idx]?.capacity?.message}</p>
+                          )}
+                        </div>
+                      </div>
+                      {slotFields.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeSlot(idx)}
+                          className="mt-5 p-1 text-red-400 hover:text-red-600"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <Label>Capacidad (cupos) *</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    {...register('capacity')}
-                    className="mt-1"
-                    placeholder="5"
-                  />
-                  {errors.capacity && (
-                    <p className="text-xs text-red-500 mt-1">{errors.capacity.message}</p>
-                  )}
-                </div>
+                {errors.timeSlots?.root && (
+                  <p className="text-xs text-red-500 mt-1">{errors.timeSlots.root.message}</p>
+                )}
+                {selectedDays.length > 0 && slotFields.length > 0 && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    Se crearán {selectedDays.length * slotFields.length} horario(s): {selectedDays.length} día(s) × {slotFields.length} franja(s)
+                  </p>
+                )}
               </div>
 
               {/* Date range */}
@@ -364,44 +403,44 @@ export default function ClassesPage() {
               Cancelar
             </Button>
             <Button type="submit" disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? 'Guardando...' : editing ? 'Guardar cambios' : 'Crear clase'}
+              {saveMutation.isPending ? 'Guardando...' : editing ? 'Guardar cambios' : 'Crear evento'}
             </Button>
           </div>
         </form>
       </Modal>
 
-      {/* Delete confirm */}
       <ConfirmDialog
         open={!!deleting}
         onClose={() => setDeleting(null)}
         onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
         loading={deleteMutation.isPending}
-        title="Desactivar clase"
-        description={`¿Desactivar "${deleting?.name}"? La clase quedará inactiva y no generará disponibilidad.`}
+        title="Desactivar evento"
+        description={`¿Desactivar "${deleting?.name}"? El evento quedará inactivo y no generará disponibilidad.`}
         confirmLabel="Desactivar"
       />
     </div>
   );
 }
 
-// ─── Class Card Component ─────────────────────────────────────────────────────
+// ─── Event Card ───────────────────────────────────────────────────────────────
 
-function ClassCard({
-  service,
-  onEdit,
-  onDelete,
-}: {
-  service: Service;
-  onEdit: () => void;
-  onDelete: () => void;
-}) {
+function EventCard({
+  service, onEdit, onDelete,
+}: { service: Service; onEdit: () => void; onDelete: () => void }) {
   const { data: rules } = useQuery({
     queryKey: ['rules', service.id],
-    queryFn: () => rulesApi.list(service.id),
+    queryFn:  () => rulesApi.list(service.id),
   });
 
-  const activeDays = Array.from(new Set(rules?.filter((r) => r.isActive).map((r) => r.dayOfWeek) ?? [])).sort();
-  const sampleRule = rules?.find((r) => r.isActive);
+  const activeDays = Array.from(
+    new Set(rules?.filter((r) => r.isActive).map((r) => r.dayOfWeek) ?? []),
+  ).sort();
+
+  // Group rules by day to show multiple times
+  const timesByDay = activeDays.map((day) => ({
+    day,
+    times: rules?.filter((r) => r.isActive && r.dayOfWeek === day) ?? [],
+  }));
 
   return (
     <div className="border rounded-xl p-5 bg-white hover:shadow-md transition-shadow space-y-4">
@@ -413,7 +452,7 @@ function ClassCard({
           )}
         </div>
         <Badge variant={service.isActive ? 'success' : 'muted'}>
-          {service.isActive ? 'Activa' : 'Inactiva'}
+          {service.isActive ? 'Activo' : 'Inactivo'}
         </Badge>
       </div>
 
@@ -422,20 +461,27 @@ function ClassCard({
           <Clock className="h-3.5 w-3.5 text-gray-400 shrink-0" />
           <span>{service.slotDurationMinutes} min · {service.timezone}</span>
         </div>
-        {sampleRule && (
-          <div className="flex items-center gap-2">
-            <CalendarDays className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-            <span>
-              {sampleRule.startTime.substring(0, 5)}–{sampleRule.endTime.substring(0, 5)}
-              {sampleRule.validFrom && (
-                <span className="text-gray-400"> · desde {sampleRule.validFrom}</span>
-              )}
-              {sampleRule.validUntil && (
-                <span className="text-gray-400"> hasta {sampleRule.validUntil}</span>
-              )}
-            </span>
+
+        {/* Show all time slots grouped by day */}
+        {timesByDay.length > 0 && (
+          <div className="flex items-start gap-2">
+            <CalendarDays className="h-3.5 w-3.5 text-gray-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              {timesByDay.map(({ day, times }) => (
+                <div key={day} className="text-xs">
+                  <span className="font-medium text-gray-700">{DAY_NAMES[day]}:</span>{' '}
+                  {times.map((t, i) => (
+                    <span key={t.id}>
+                      {t.startTime.substring(0, 5)}–{t.endTime.substring(0, 5)}
+                      {i < times.length - 1 ? ', ' : ''}
+                    </span>
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
         )}
+
         {activeDays.length > 0 && (
           <div className="flex items-center gap-2">
             <Users className="h-3.5 w-3.5 text-gray-400 shrink-0" />
@@ -456,16 +502,13 @@ function ClassCard({
           Editar
         </Button>
         <Button
-          size="sm"
-          variant="ghost"
-          onClick={onDelete}
+          size="sm" variant="ghost" onClick={onDelete}
           className="text-red-500 hover:text-red-700 hover:bg-red-50"
         >
           <Trash2 className="h-3 w-3" />
         </Button>
         <Button
-          size="sm"
-          variant="ghost"
+          size="sm" variant="ghost"
           onClick={() => window.open(`/services/${service.id}`, '_blank')}
           className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
         >

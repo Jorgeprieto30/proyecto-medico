@@ -17,9 +17,9 @@ import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/classes', label: 'Clases', icon: Dumbbell },
+  { href: '/classes', label: 'Eventos', icon: Dumbbell },
   { href: '/calendar', label: 'Calendario', icon: CalendarDays },
-  { href: '/reservations', label: 'Reservas', icon: ClipboardList },
+  { href: '/reservations', label: 'Actividad', icon: ClipboardList },
   { href: '/services', label: 'Servicios', icon: Settings2 },
   { href: '/api-docs', label: 'API Docs', icon: BookOpen },
   { href: '/settings', label: 'Configuración', icon: KeyRound },
