@@ -6,7 +6,7 @@ import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Clock, Globe } from 'lucide-react';
+import { Plus, Pencil, Trash2, Clock, Globe, CalendarPlus } from 'lucide-react';
 
 import { servicesApi, rulesApi, blocksApi } from '@/lib/api';
 import type { Service } from '@/types';
@@ -19,6 +19,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { PageSpinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { UnifiedEditModal } from '@/components/services/unified-edit-modal';
+import { BookingModal } from '@/components/services/booking-modal';
 
 // ─── Short day labels ──────────────────────────────────────────────────────────
 
@@ -64,9 +65,10 @@ const DEFAULT_CREATE: CreateForm = {
 
 export default function EventosPage() {
   const qc = useQueryClient();
-  const [createOpen, setCreateOpen]     = useState(false);
+  const [createOpen, setCreateOpen]       = useState(false);
   const [editServiceId, setEditServiceId] = useState<string | null>(null);
-  const [deleteId, setDeleteId]         = useState<string | null>(null);
+  const [bookingService, setBookingService] = useState<Service | null>(null);
+  const [deleteId, setDeleteId]           = useState<string | null>(null);
 
   const { data: services, isLoading } = useQuery({
     queryKey: ['services'],
@@ -169,6 +171,7 @@ export default function EventosPage() {
               onToggle={() => toggleMutation.mutate(svc)}
               toggling={toggleMutation.isPending}
               onDelete={() => setDeleteId(svc.id)}
+              onBook={() => setBookingService(svc)}
             />
           ))}
         </div>
@@ -308,6 +311,12 @@ export default function EventosPage() {
         onClose={() => setEditServiceId(null)}
       />
 
+      {/* Booking modal */}
+      <BookingModal
+        service={bookingService}
+        onClose={() => setBookingService(null)}
+      />
+
       <ConfirmDialog
         open={!!deleteId}
         onClose={() => setDeleteId(null)}
@@ -325,13 +334,14 @@ export default function EventosPage() {
 // ─── Event Row ────────────────────────────────────────────────────────────────
 
 function EventRow({
-  service, onEdit, onToggle, toggling, onDelete,
+  service, onEdit, onToggle, toggling, onDelete, onBook,
 }: {
   service: Service;
   onEdit: () => void;
   onToggle: () => void;
   toggling: boolean;
   onDelete: () => void;
+  onBook: () => void;
 }) {
   const { data: rules } = useQuery({
     queryKey: ['rules', service.id],
@@ -405,6 +415,13 @@ function EventRow({
 
       {/* Actions */}
       <div className="shrink-0 flex items-center gap-1">
+        {service.isActive && (
+          <Button size="sm" variant="outline" onClick={onBook}
+            className="gap-1.5 text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-400">
+            <CalendarPlus className="h-3.5 w-3.5" />
+            Reservar
+          </Button>
+        )}
         <Button size="sm" variant="outline" onClick={onEdit} className="gap-1.5">
           <Pencil className="h-3.5 w-3.5" />
           Editar
