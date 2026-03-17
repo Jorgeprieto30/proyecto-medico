@@ -655,8 +655,9 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
     queryFn: () => reservationsApi.list({ service_id: slot.serviceId, date }),
   });
 
+  const slotTs = new Date(slot.slot_start).getTime();
   const slotReservations = allReservations?.filter(
-    (r) => r.slotStart === slot.slot_start && r.status !== 'cancelled',
+    (r) => new Date(r.slotStart).getTime() === slotTs && r.status !== 'cancelled',
   ) ?? [];
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<ReserveForm>({
