@@ -103,6 +103,54 @@ interface CalendarSlot extends SlotAvailability {
   heightPx: number;
 }
 
+interface LaidOutSlot extends CalendarSlot {
+  col: number;
+  totalCols: number;
+}
+
+/**
+ * Assigns non-overlapping column indices to slots so they can be rendered
+ * side-by-side instead of stacking on top of each other.
+ */
+function layoutSlots(slots: CalendarSlot[]): LaidOutSlot[] {
+  const sorted = [...slots].sort((a, b) => a.topPx - b.topPx);
+  const result: LaidOutSlot[] = sorted.map((s) => ({ ...s, col: 0, totalCols: 1 }));
+
+  // Greedy column assignment
+  const columns: LaidOutSlot[][] = [];
+  for (const slot of result) {
+    let placed = false;
+    for (let c = 0; c < columns.length; c++) {
+      const last = columns[c][columns[c].length - 1];
+      if (last.topPx + last.heightPx <= slot.topPx) {
+        slot.col = c;
+        columns[c].push(slot);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      slot.col = columns.length;
+      columns.push([slot]);
+    }
+  }
+
+  // Determine totalCols: max col+1 among all mutually overlapping slots
+  for (const slot of result) {
+    let maxCol = slot.col;
+    for (const other of result) {
+      if (other === slot) continue;
+      const overlapEnd = Math.min(slot.topPx + slot.heightPx, other.topPx + other.heightPx);
+      if (overlapEnd > Math.max(slot.topPx, other.topPx)) {
+        maxCol = Math.max(maxCol, other.col);
+      }
+    }
+    slot.totalCols = maxCol + 1;
+  }
+
+  return result;
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function CalendarPage() {
@@ -334,6 +382,8 @@ function DayView({
   hourLabels: string[];
   onSelectSlot: (s: CalendarSlot) => void;
 }) {
+  const laid = layoutSlots(slots);
+
   return (
     <div className="border rounded-xl overflow-hidden bg-white">
       <div className="flex">
@@ -359,20 +409,28 @@ function DayView({
             <div key={`h${i}`} className="absolute left-0 right-0 border-t border-dashed border-gray-50" style={{ top: i * HOUR_HEIGHT_PX + HOUR_HEIGHT_PX / 2 }} />
           ))}
 
-          {slots.length === 0 ? (
+          {laid.length === 0 ? (
             <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-400">
               Sin clases para este día
             </div>
           ) : (
-            slots.map((slot, idx) => {
+            laid.map((slot, idx) => {
               const color = COLORS[slot.colorIdx];
               const pct = slot.capacity > 0 ? (slot.available / slot.capacity) * 100 : 0;
+              const GAP = 2; // px gap between columns
+              const colW = 100 / slot.totalCols;
+              const leftPct = slot.col * colW;
               return (
                 <button
                   key={idx}
                   onClick={() => onSelectSlot(slot)}
-                  className={`absolute left-1 right-1 rounded-lg border px-2 py-1 text-left overflow-hidden transition-all hover:shadow-md hover:scale-[1.01] ${color.light}`}
-                  style={{ top: slot.topPx + 1, height: slot.heightPx - 2 }}
+                  className={`absolute rounded-lg border px-2 py-1 text-left overflow-hidden transition-all hover:shadow-md hover:z-10 ${color.light}`}
+                  style={{
+                    top: slot.topPx + 1,
+                    height: slot.heightPx - 2,
+                    left: `calc(${leftPct}% + ${GAP}px)`,
+                    width: `calc(${colW}% - ${GAP * 2}px)`,
+                  }}
                 >
                   <div className="flex items-start justify-between gap-1">
                     <span className="text-xs font-semibold leading-tight truncate">{slot.serviceName}</span>
@@ -459,7 +517,7 @@ function WeekView({
 
         {/* 7 day columns */}
         {weekDays.map((d) => {
-          const slots = slotsByDate[d] ?? [];
+          const laid = layoutSlots(slotsByDate[d] ?? []);
           return (
             <div key={d} className="flex-1 min-w-[80px] relative border-l border-gray-50" style={{ height: TOTAL_HEIGHT }}>
               {/* Hour lines */}
@@ -467,14 +525,22 @@ function WeekView({
                 <div key={i} className="absolute left-0 right-0 border-t border-gray-100" style={{ top: i * HOUR_HEIGHT_PX }} />
               ))}
               {/* Slots */}
-              {slots.map((slot, idx) => {
+              {laid.map((slot, idx) => {
                 const color = COLORS[slot.colorIdx];
+                const GAP = 1;
+                const colW = 100 / slot.totalCols;
+                const leftPct = slot.col * colW;
                 return (
                   <button
                     key={idx}
                     onClick={() => onSelectSlot(slot)}
-                    className={`absolute left-0.5 right-0.5 rounded border px-1 text-left overflow-hidden transition-all hover:shadow-md hover:z-10 ${color.light}`}
-                    style={{ top: slot.topPx + 1, height: slot.heightPx - 2 }}
+                    className={`absolute rounded border px-1 text-left overflow-hidden transition-all hover:shadow-md hover:z-10 ${color.light}`}
+                    style={{
+                      top: slot.topPx + 1,
+                      height: slot.heightPx - 2,
+                      left: `calc(${leftPct}% + ${GAP}px)`,
+                      width: `calc(${colW}% - ${GAP * 2}px)`,
+                    }}
                   >
                     <span className="text-xs font-semibold leading-tight truncate block">{slot.serviceName}</span>
                     {slot.heightPx > 32 && (
