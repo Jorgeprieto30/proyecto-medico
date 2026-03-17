@@ -21,7 +21,8 @@
       "WebFetch(domain:karloozaeta.com)",
       "WebFetch(domain:cieden.com)",
       "WebFetch(domain:www.eleken.co)",
-      "WebFetch(domain:baymard.com)"
+      "WebFetch(domain:baymard.com)",
+      "Bash(grep -v \"^$\")"
     ]
   }
 }
