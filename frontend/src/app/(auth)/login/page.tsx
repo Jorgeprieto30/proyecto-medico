@@ -38,6 +38,7 @@ function LoginForm() {
     if (result?.error) {
       setError('Email o contraseña incorrectos');
     } else {
+      router.refresh();
       router.push(callbackUrl);
     }
   };
