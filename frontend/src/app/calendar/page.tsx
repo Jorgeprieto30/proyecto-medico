@@ -1,13 +1,19 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Info } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { ChevronLeft, ChevronRight, Info, UserPlus } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { servicesApi, availabilityApi, reservationsApi } from '@/lib/api';
-import type { SlotAvailability, Reservation } from '@/types';
+import type { SlotAvailability } from '@/types';
 import { todayAsString } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Modal } from '@/components/ui/modal';
 import { PageSpinner } from '@/components/ui/spinner';
 
@@ -628,9 +634,19 @@ function YearView({ date, onSelectDate }: { date: string; onSelectDate: (d: stri
   );
 }
 
+// ─── Reserve form schema ──────────────────────────────────────────────────────
+
+const reserveSchema = z.object({
+  customer_name:        z.string().min(1, 'Nombre requerido'),
+  customer_external_id: z.string().optional(),
+});
+type ReserveForm = z.infer<typeof reserveSchema>;
+
 // ─── Slot Detail ──────────────────────────────────────────────────────────────
 
 function SlotDetail({ slot }: { slot: CalendarSlot }) {
+  const qc = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
   const pct = slot.capacity > 0 ? (slot.reserved / slot.capacity) * 100 : 0;
   const date = slot.slot_start.split('T')[0];
 
@@ -643,14 +659,38 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
     (r) => r.slotStart === slot.slot_start && r.status !== 'cancelled',
   ) ?? [];
 
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<ReserveForm>({
+    resolver: zodResolver(reserveSchema),
+  });
+
+  const reserveMutation = useMutation({
+    mutationFn: (data: ReserveForm) =>
+      reservationsApi.create({
+        service_id: slot.serviceId,
+        slot_start: slot.slot_start,
+        customer_name: data.customer_name,
+        customer_external_id: data.customer_external_id || undefined,
+      }),
+    onSuccess: () => {
+      toast.success('Reserva creada correctamente');
+      reset();
+      setShowForm(false);
+      qc.invalidateQueries({ queryKey: ['slot-reservations', slot.serviceId, date] });
+      qc.invalidateQueries({ queryKey: ['calendar'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-4">
+      {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         <StatBox label="Capacidad" value={slot.capacity} color="text-gray-900" />
         <StatBox label="Reservados" value={slot.reserved} color="text-blue-600" />
         <StatBox label="Disponibles" value={slot.available} color={slot.available > 0 ? 'text-green-600' : 'text-red-600'} />
       </div>
 
+      {/* Occupancy bar */}
       <div>
         <div className="flex justify-between text-xs text-gray-500 mb-1">
           <span>Ocupación</span>
@@ -665,11 +705,9 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
       </div>
 
       <div className={`flex items-center gap-2 text-sm font-medium p-3 rounded-lg ${
-        slot.available === 0
-          ? 'bg-red-50 text-red-700'
-          : slot.available <= 2
-          ? 'bg-yellow-50 text-yellow-700'
-          : 'bg-green-50 text-green-700'
+        slot.available === 0 ? 'bg-red-50 text-red-700'
+        : slot.available <= 2 ? 'bg-yellow-50 text-yellow-700'
+        : 'bg-green-50 text-green-700'
       }`}>
         <Info className="h-4 w-4 shrink-0" />
         {slot.available === 0
@@ -682,7 +720,7 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
       {/* Registered people */}
       <div>
         <h3 className="text-sm font-semibold text-gray-700 mb-2">
-          Personas inscritas {slotReservations.length > 0 && `(${slotReservations.length})`}
+          Personas inscritas{slotReservations.length > 0 ? ` (${slotReservations.length})` : ''}
         </h3>
         {loadingRes ? (
           <p className="text-xs text-gray-400 py-2">Cargando...</p>
@@ -694,7 +732,7 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="px-3 py-2 text-left font-medium text-gray-500">Nombre</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">RUT</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">RUT / ID</th>
                   <th className="px-3 py-2 text-left font-medium text-gray-500">Estado</th>
                 </tr>
               </thead>
@@ -704,10 +742,8 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
                     <td className="px-3 py-2 text-gray-800">{r.customerName ?? '—'}</td>
                     <td className="px-3 py-2 font-mono text-gray-500">{r.customerExternalId ?? '—'}</td>
                     <td className="px-3 py-2">
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
-                        r.status === 'confirmed'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-yellow-100 text-yellow-700'
+                      <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${
+                        r.status === 'confirmed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                       }`}>
                         {r.status === 'confirmed' ? 'Confirmado' : 'Pendiente'}
                       </span>
@@ -720,28 +756,38 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
         )}
       </div>
 
-      <div className="text-sm text-gray-600 space-y-1">
-        <div className="flex justify-between">
-          <span className="text-gray-400">Inicio</span>
-          <span className="font-medium">{formatHHMM(slot.slot_start, slot.timezone)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-400">Fin</span>
-          <span className="font-medium">{formatHHMM(slot.slot_end, slot.timezone)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-400">Zona horaria</span>
-          <span className="font-medium">{slot.timezone}</span>
-        </div>
-      </div>
-
-      {slot.bookable && (
-        <Button
-          className="w-full"
-          onClick={() => { window.location.href = `/availability?service_id=${slot.serviceId}`; }}
-        >
-          Ir a reservar →
+      {/* Reserve inline form */}
+      {slot.bookable && !showForm && (
+        <Button className="w-full" onClick={() => setShowForm(true)}>
+          <UserPlus className="h-4 w-4" />
+          Nueva reserva en este horario
         </Button>
+      )}
+
+      {slot.bookable && showForm && (
+        <div className="border rounded-xl p-4 bg-gray-50 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-800">Nueva reserva</h3>
+            <button onClick={() => { setShowForm(false); reset(); }}
+              className="text-xs text-gray-400 hover:text-gray-600">✕ Cancelar</button>
+          </div>
+          <form onSubmit={handleSubmit((d) => reserveMutation.mutate(d))} className="space-y-3">
+            <div>
+              <Label className="text-xs">Nombre del cliente *</Label>
+              <Input {...register('customer_name')} className="mt-1 h-8 text-sm" placeholder="ej: Juan Pérez" />
+              {errors.customer_name && <p className="text-xs text-red-500 mt-0.5">{errors.customer_name.message}</p>}
+            </div>
+            <div>
+              <Label className="text-xs">RUT / ID (opcional)</Label>
+              <Input {...register('customer_external_id')} className="mt-1 h-8 text-sm" placeholder="ej: 12.345.678-9" />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button type="submit" className="flex-1" disabled={reserveMutation.isPending}>
+                {reserveMutation.isPending ? 'Reservando...' : 'Confirmar reserva'}
+              </Button>
+            </div>
+          </form>
+        </div>
       )}
     </div>
   );
