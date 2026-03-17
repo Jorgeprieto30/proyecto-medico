@@ -66,6 +66,7 @@ export default function EventosPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing]     = useState<Service | null>(null);
   const [deleting, setDeleting]   = useState<Service | null>(null);
+  const [deleteId, setDeleteId]   = useState<string | null>(null);
 
   const { data: services, isLoading } = useQuery({
     queryKey: ['services'],
@@ -163,7 +164,7 @@ export default function EventosPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const deleteMutation = useMutation({
+  const deactivateMutation = useMutation({
     mutationFn: async (id: string) => servicesApi.update(id, { isActive: false }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['services'] });
@@ -171,6 +172,25 @@ export default function EventosPage() {
       setDeleting(null);
     },
     onError: (e: Error) => toast.error(e.message),
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: (svc: Service) => servicesApi.update(svc.id, { isActive: !svc.isActive }),
+    onSuccess: (updated) => {
+      qc.invalidateQueries({ queryKey: ['services'] });
+      toast.success(updated.isActive ? 'Evento activado' : 'Evento desactivado');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => servicesApi.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['services'] });
+      toast.success('Evento eliminado');
+      setDeleteId(null);
+    },
+    onError: (e: Error) => { toast.error(e.message); setDeleteId(null); },
   });
 
   if (isLoading) return <PageSpinner />;
@@ -208,7 +228,10 @@ export default function EventosPage() {
               key={svc.id}
               service={svc}
               onEdit={() => openEdit(svc)}
-              onDelete={() => setDeleting(svc)}
+              onDeactivate={() => setDeleting(svc)}
+              onDelete={() => setDeleteId(svc.id)}
+              onToggle={() => toggleMutation.mutate(svc)}
+              toggling={toggleMutation.isPending}
             />
           ))}
         </div>
@@ -412,11 +435,22 @@ export default function EventosPage() {
       <ConfirmDialog
         open={!!deleting}
         onClose={() => setDeleting(null)}
-        onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
-        loading={deleteMutation.isPending}
+        onConfirm={() => deleting && deactivateMutation.mutate(deleting.id)}
+        loading={deactivateMutation.isPending}
         title="Desactivar evento"
         description={`¿Desactivar "${deleting?.name}"? El evento quedará inactivo y no generará disponibilidad.`}
         confirmLabel="Desactivar"
+      />
+
+      <ConfirmDialog
+        open={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
+        loading={deleteMutation.isPending}
+        title="Eliminar evento"
+        description="Esta acción es permanente. Se eliminará el evento y toda su configuración de horarios."
+        confirmLabel="Eliminar"
+        variant="destructive"
       />
     </div>
   );
@@ -425,8 +459,15 @@ export default function EventosPage() {
 // ─── Event Card ───────────────────────────────────────────────────────────────
 
 function EventCard({
-  service, onEdit, onDelete,
-}: { service: Service; onEdit: () => void; onDelete: () => void }) {
+  service, onEdit, onDeactivate, onDelete, onToggle, toggling,
+}: {
+  service: Service;
+  onEdit: () => void;
+  onDeactivate: () => void;
+  onDelete: () => void;
+  onToggle: () => void;
+  toggling: boolean;
+}) {
   const { data: rules } = useQuery({
     queryKey: ['rules', service.id],
     queryFn:  () => rulesApi.list(service.id),
@@ -496,24 +537,44 @@ function EventCard({
         )}
       </div>
 
-      <div className="flex gap-2 pt-1">
-        <Button size="sm" variant="outline" className="flex-1" onClick={onEdit}>
-          <Pencil className="h-3 w-3" />
-          Editar
-        </Button>
-        <Button
-          size="sm" variant="ghost" onClick={onDelete}
-          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+      {/* Toggle + actions */}
+      <div className="flex items-center justify-between pt-1">
+        {/* Active toggle */}
+        <button
+          role="switch"
+          aria-checked={service.isActive}
+          onClick={onToggle}
+          disabled={toggling}
+          title={service.isActive ? 'Desactivar' : 'Activar'}
+          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${
+            service.isActive ? 'bg-blue-600' : 'bg-gray-300'
+          }`}
         >
-          <Trash2 className="h-3 w-3" />
-        </Button>
-        <Button
-          size="sm" variant="ghost"
-          onClick={() => window.open(`/services/${service.id}`, '_blank')}
-          className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-        >
-          Configurar →
-        </Button>
+          <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${service.isActive ? 'translate-x-4' : 'translate-x-1'}`} />
+        </button>
+
+        <div className="flex gap-1">
+          <Button size="sm" variant="outline" onClick={onEdit}>
+            <Pencil className="h-3 w-3" />
+            Editar
+          </Button>
+          <Button
+            size="sm" variant="ghost"
+            onClick={() => window.open(`/services/${service.id}`, '_blank')}
+            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+          >
+            Horarios →
+          </Button>
+          {service.isActive ? (
+            <Button size="sm" variant="ghost" onClick={onDeactivate} className="text-orange-500 hover:text-orange-700 hover:bg-orange-50">
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          ) : (
+            <Button size="sm" variant="ghost" onClick={onDelete} className="text-red-500 hover:text-red-700 hover:bg-red-50">
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

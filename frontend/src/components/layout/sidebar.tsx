@@ -20,7 +20,6 @@ const navItems = [
   { href: '/classes', label: 'Eventos', icon: Dumbbell },
   { href: '/calendar', label: 'Calendario', icon: CalendarDays },
   { href: '/reservations', label: 'Actividad', icon: ClipboardList },
-  { href: '/services', label: 'Servicios', icon: Settings2 },
   { href: '/api-docs', label: 'API Docs', icon: BookOpen },
   { href: '/settings', label: 'Configuración', icon: KeyRound },
 ];

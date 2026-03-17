@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, Trash2, Copy, Check, KeyRound } from 'lucide-react';
+import { Plus, Trash2, Copy, Check, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -52,21 +52,41 @@ type FormData = z.infer<typeof schema>;
 
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
-
   const copy = async () => {
     await navigator.clipboard.writeText(value);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
   return (
-    <button
-      onClick={copy}
-      className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-      title="Copiar"
-    >
+    <button onClick={copy} className="p-1 text-gray-400 hover:text-blue-600 transition-colors" title="Copiar">
       {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
     </button>
+  );
+}
+
+function KeyCell({ keyValue, prefix }: { keyValue: string | null; prefix: string }) {
+  const [revealed, setRevealed] = useState(false);
+
+  if (!keyValue) {
+    return (
+      <span className="text-xs text-gray-400 italic">
+        {prefix}… <span className="text-gray-300">(clave anterior — crea una nueva para copiarla)</span>
+      </span>
+    );
+  }
+
+  const display = revealed ? keyValue : `${keyValue.slice(0, 12)}${'•'.repeat(16)}`;
+
+  return (
+    <div className="flex items-center gap-1">
+      <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono text-gray-700 max-w-[260px] truncate block">
+        {display}
+      </code>
+      <button onClick={() => setRevealed((v) => !v)} className="p-1 text-gray-400 hover:text-blue-600 transition-colors" title={revealed ? 'Ocultar' : 'Revelar'}>
+        {revealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+      </button>
+      <CopyButton value={keyValue} />
+    </div>
   );
 }
 
@@ -148,12 +168,7 @@ export default function SettingsPage() {
                   <tr key={k.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">{k.name}</td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono text-gray-700 max-w-[220px] truncate block">
-                          {k.key_value ?? `${k.prefix}…`}
-                        </code>
-                        {k.key_value && <CopyButton value={k.key_value} />}
-                      </div>
+                      <KeyCell keyValue={k.key_value} prefix={k.prefix} />
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={k.is_active ? 'success' : 'muted'}>

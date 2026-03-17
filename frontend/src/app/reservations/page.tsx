@@ -116,17 +116,18 @@ export default function ActivityPage() {
       .sort((a, b) => b.count - a.count);
   }, [inRange, services]);
 
-  // Reservations per day (last 14 days for the bar chart)
-  const last14 = useMemo(() => {
-    const chartStart = changeDate(today, -13);
-    const days = Array.from({ length: 14 }, (_, i) => changeDate(chartStart, i));
+  // Bar chart: cap at 30 bars for readability, use selected range
+  const chartDays = Math.min(rangeDays, 30);
+  const chartData = useMemo(() => {
+    const chartStart = changeDate(today, -(chartDays - 1));
+    const days = Array.from({ length: chartDays }, (_, i) => changeDate(chartStart, i));
     return days.map((d) => ({
       date: d,
       count: inRange.filter((r) => r.slotStart.startsWith(d) && r.status !== 'cancelled').length,
     }));
-  }, [inRange, today]);
+  }, [inRange, today, chartDays]);
 
-  const maxCount = Math.max(...last14.map((d) => d.count), 1);
+  const maxCount = Math.max(...chartData.map((d) => d.count), 1);
 
   // Recent activity (last 20, sorted by slotStart desc)
   const recent = useMemo(() => {
@@ -184,26 +185,28 @@ export default function ActivityPage() {
         <div className="lg:col-span-2 bg-white border rounded-xl p-5">
           <h2 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-blue-500" />
-            Reservas por día (últimos 14 días)
+            Reservas por día (últimos {chartDays} días)
           </h2>
-          <div className="flex items-end gap-1 h-32">
-            {last14.map(({ date, count }) => (
+          <div className="flex items-end gap-0.5 h-32">
+            {chartData.map(({ date, count }) => (
               <div key={date} className="flex-1 flex flex-col items-center gap-1">
                 <span className="text-xs text-gray-400">{count > 0 ? count : ''}</span>
                 <div
                   className="w-full rounded-t-sm bg-blue-500 transition-all"
                   style={{ height: `${(count / maxCount) * 96}px`, minHeight: count > 0 ? 4 : 2, opacity: count > 0 ? 1 : 0.15 }}
                 />
-                <span className="text-xs text-gray-400 -rotate-45 origin-top-left translate-y-3 translate-x-1">
-                  {new Date(date + 'T12:00:00').getDate()}
-                </span>
+                {chartDays <= 14 && (
+                  <span className="text-xs text-gray-400 -rotate-45 origin-top-left translate-y-3 translate-x-1">
+                    {new Date(date + 'T12:00:00').getDate()}
+                  </span>
+                )}
               </div>
             ))}
           </div>
           <div className="text-xs text-gray-400 text-center mt-6">
-            {new Date(last14[0].date + 'T12:00:00').toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })}
+            {new Date(chartData[0].date + 'T12:00:00').toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })}
             {' — '}
-            {new Date(last14[13].date + 'T12:00:00').toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })}
+            {new Date(chartData[chartData.length - 1].date + 'T12:00:00').toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })}
           </div>
         </div>
 

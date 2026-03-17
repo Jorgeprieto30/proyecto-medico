@@ -153,9 +153,21 @@ function layoutSlots(slots: CalendarSlot[]): LaidOutSlot[] {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+function usePersistentView(): [ViewMode, (v: ViewMode) => void] {
+  const [view, setViewState] = useState<ViewMode>(() => {
+    if (typeof window === 'undefined') return 'day';
+    return (localStorage.getItem('calendar-view') as ViewMode) ?? 'day';
+  });
+  const setView = (v: ViewMode) => {
+    localStorage.setItem('calendar-view', v);
+    setViewState(v);
+  };
+  return [view, setView];
+}
+
 export default function CalendarPage() {
-  const [date, setDate]           = useState(todayAsString());
-  const [view, setView]           = useState<ViewMode>('day');
+  const [date, setDate] = useState(todayAsString());
+  const [view, setView] = usePersistentView();
   const [filterServiceId, setFilterServiceId] = useState<string>('');
   const [selectedSlot, setSelectedSlot] = useState<CalendarSlot | null>(null);
 
