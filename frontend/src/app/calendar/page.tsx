@@ -4,8 +4,8 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Info } from 'lucide-react';
 
-import { servicesApi, availabilityApi } from '@/lib/api';
-import type { SlotAvailability } from '@/types';
+import { servicesApi, availabilityApi, reservationsApi } from '@/lib/api';
+import type { SlotAvailability, Reservation } from '@/types';
 import { todayAsString } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
@@ -632,6 +632,16 @@ function YearView({ date, onSelectDate }: { date: string; onSelectDate: (d: stri
 
 function SlotDetail({ slot }: { slot: CalendarSlot }) {
   const pct = slot.capacity > 0 ? (slot.reserved / slot.capacity) * 100 : 0;
+  const date = slot.slot_start.split('T')[0];
+
+  const { data: allReservations, isLoading: loadingRes } = useQuery({
+    queryKey: ['slot-reservations', slot.serviceId, date],
+    queryFn: () => reservationsApi.list({ service_id: slot.serviceId, date }),
+  });
+
+  const slotReservations = allReservations?.filter(
+    (r) => r.slotStart === slot.slot_start && r.status !== 'cancelled',
+  ) ?? [];
 
   return (
     <div className="space-y-4">
@@ -667,6 +677,47 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
           : slot.available <= 2
           ? `¡Últimos ${slot.available} cupo${slot.available > 1 ? 's' : ''}!`
           : `${slot.available} cupos disponibles`}
+      </div>
+
+      {/* Registered people */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-700 mb-2">
+          Personas inscritas {slotReservations.length > 0 && `(${slotReservations.length})`}
+        </h3>
+        {loadingRes ? (
+          <p className="text-xs text-gray-400 py-2">Cargando...</p>
+        ) : slotReservations.length === 0 ? (
+          <p className="text-xs text-gray-400 py-2">Sin reservas activas para este horario.</p>
+        ) : (
+          <div className="border rounded-lg overflow-hidden">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">Nombre</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">RUT</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {slotReservations.map((r) => (
+                  <tr key={r.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2 text-gray-800">{r.customerName ?? '—'}</td>
+                    <td className="px-3 py-2 font-mono text-gray-500">{r.customerExternalId ?? '—'}</td>
+                    <td className="px-3 py-2">
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                        r.status === 'confirmed'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {r.status === 'confirmed' ? 'Confirmado' : 'Pendiente'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="text-sm text-gray-600 space-y-1">

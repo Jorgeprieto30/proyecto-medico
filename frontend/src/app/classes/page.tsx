@@ -19,6 +19,7 @@ import { Modal } from '@/components/ui/modal';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { PageSpinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ServiceDetailModal } from '@/components/services/service-detail-modal';
 
 const TIMEZONES = [
   'America/Santiago',
@@ -67,6 +68,7 @@ export default function EventosPage() {
   const [editing, setEditing]     = useState<Service | null>(null);
   const [deleting, setDeleting]   = useState<Service | null>(null);
   const [deleteId, setDeleteId]   = useState<string | null>(null);
+  const [detailServiceId, setDetailServiceId] = useState<string | null>(null);
 
   const { data: services, isLoading } = useQuery({
     queryKey: ['services'],
@@ -232,6 +234,7 @@ export default function EventosPage() {
               onDelete={() => setDeleteId(svc.id)}
               onToggle={() => toggleMutation.mutate(svc)}
               toggling={toggleMutation.isPending}
+              onHorarios={() => setDetailServiceId(svc.id)}
             />
           ))}
         </div>
@@ -452,6 +455,11 @@ export default function EventosPage() {
         confirmLabel="Eliminar"
         variant="destructive"
       />
+
+      <ServiceDetailModal
+        serviceId={detailServiceId}
+        onClose={() => setDetailServiceId(null)}
+      />
     </div>
   );
 }
@@ -459,7 +467,7 @@ export default function EventosPage() {
 // ─── Event Card ───────────────────────────────────────────────────────────────
 
 function EventCard({
-  service, onEdit, onDeactivate, onDelete, onToggle, toggling,
+  service, onEdit, onDeactivate, onDelete, onToggle, toggling, onHorarios,
 }: {
   service: Service;
   onEdit: () => void;
@@ -467,6 +475,7 @@ function EventCard({
   onDelete: () => void;
   onToggle: () => void;
   toggling: boolean;
+  onHorarios: () => void;
 }) {
   const { data: rules } = useQuery({
     queryKey: ['rules', service.id],
@@ -560,7 +569,7 @@ function EventCard({
           </Button>
           <Button
             size="sm" variant="ghost"
-            onClick={() => window.open(`/services/${service.id}`, '_blank')}
+            onClick={onHorarios}
             className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
           >
             Horarios →
