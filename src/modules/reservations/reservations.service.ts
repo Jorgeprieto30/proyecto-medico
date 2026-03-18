@@ -107,19 +107,23 @@ export class ReservationsService {
   }
 
   async findAll(query: ListReservationsQuery): Promise<Reservation[]> {
-    const service = await this.servicesService.findOne(query.service_id);
-
     const qb = this.reservationRepo
       .createQueryBuilder('r')
-      .where('r.service_id = :serviceId', { serviceId: query.service_id })
       .orderBy('r.slot_start', 'ASC');
 
+    if (query.service_id) {
+      qb.andWhere('r.service_id = :serviceId', { serviceId: query.service_id });
+    }
+
     if (query.date) {
-      const startOfDay = DateTime.fromISO(query.date, { zone: service.timezone })
+      const timezone = query.service_id
+        ? (await this.servicesService.findOne(query.service_id)).timezone
+        : 'UTC';
+      const startOfDay = DateTime.fromISO(query.date, { zone: timezone })
         .startOf('day')
         .toUTC()
         .toJSDate();
-      const endOfDay = DateTime.fromISO(query.date, { zone: service.timezone })
+      const endOfDay = DateTime.fromISO(query.date, { zone: timezone })
         .endOf('day')
         .toUTC()
         .toJSDate();
