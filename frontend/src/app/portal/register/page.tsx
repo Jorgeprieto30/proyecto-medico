@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { memberLogin } from '@/lib/member-auth';
@@ -8,7 +8,7 @@ import { validateRut } from '@/lib/utils';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
-export default function PortalRegisterPage() {
+function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/portal';
@@ -153,5 +153,13 @@ export default function PortalRegisterPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function PortalRegisterPage() {
+  return (
+    <Suspense>
+      <RegisterForm />
+    </Suspense>
   );
 }
