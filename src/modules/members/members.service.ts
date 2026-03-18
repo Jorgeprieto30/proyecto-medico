@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -11,7 +12,7 @@ import * as bcrypt from 'bcrypt';
 import { Member } from './entities/member.entity';
 import { RegisterMemberDto } from './dto/register-member.dto';
 import { LoginMemberDto } from './dto/login-member.dto';
-import { UpdateMemberDto } from './dto/update-member.dto';
+import { UpdateMemberDto, ChangePasswordDto } from './dto/update-member.dto';
 
 @Injectable()
 export class MembersService {
@@ -68,6 +69,23 @@ export class MembersService {
     if (dto.last_name !== undefined) member.last_name = dto.last_name;
     if (dto.rut !== undefined) member.rut = dto.rut;
     return this.memberRepo.save(member);
+  }
+
+  async changePassword(id: string, dto: ChangePasswordDto): Promise<void> {
+    const member = await this.memberRepo
+      .createQueryBuilder('m')
+      .addSelect('m.password_hash')
+      .where('m.id = :id', { id })
+      .getOne();
+
+    if (!member || !member.password_hash) {
+      throw new NotFoundException('Miembro no encontrado');
+    }
+    const valid = await bcrypt.compare(dto.current_password, member.password_hash);
+    if (!valid) throw new BadRequestException('La contraseña actual es incorrecta');
+
+    member.password_hash = await bcrypt.hash(dto.new_password, 10);
+    await this.memberRepo.save(member);
   }
 
   private buildResponse(member: Member) {

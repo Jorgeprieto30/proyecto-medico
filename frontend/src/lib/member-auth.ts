@@ -37,6 +37,11 @@ export function getMemberProfile(): MemberProfile | null {
   }
 }
 
+export function updateMemberProfile(profile: MemberProfile): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+}
+
 export function isMemberLoggedIn(): boolean {
   return !!getMemberToken();
 }

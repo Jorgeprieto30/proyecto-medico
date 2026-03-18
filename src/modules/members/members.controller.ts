@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Post,
   Patch,
   UseGuards,
@@ -10,13 +11,15 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { MembersService } from './members.service';
 import { RegisterMemberDto } from './dto/register-member.dto';
 import { LoginMemberDto } from './dto/login-member.dto';
-import { UpdateMemberDto } from './dto/update-member.dto';
+import { UpdateMemberDto, ChangePasswordDto } from './dto/update-member.dto';
 import { MemberJwtGuard } from './guards/member-jwt.guard';
 import { Member } from './decorators/member.decorator';
 import { Member as MemberEntity } from './entities/member.entity';
 import { Public } from '../auth/decorators/public.decorator';
 import { ReservationsService } from '../reservations/reservations.service';
 import { CreateReservationDto } from '../reservations/dto/create-reservation.dto';
+import { MailService } from '../mail/mail.service';
+import { ServicesService } from '../services/services.service';
 
 @ApiTags('members')
 @Controller('members')
@@ -24,6 +27,8 @@ export class MembersController {
   constructor(
     private readonly membersService: MembersService,
     private readonly reservationsService: ReservationsService,
+    private readonly mailService: MailService,
+    private readonly servicesService: ServicesService,
   ) {}
 
   @Public()
@@ -57,6 +62,15 @@ export class MembersController {
   }
 
   @UseGuards(MemberJwtGuard)
+  @Patch('me/password')
+  @HttpCode(200)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cambiar contraseña del miembro' })
+  changePassword(@Member() member: MemberEntity, @Body() dto: ChangePasswordDto) {
+    return this.membersService.changePassword(member.id, dto);
+  }
+
+  @UseGuards(MemberJwtGuard)
   @Post('reservations')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Crear una reserva como miembro' })
@@ -73,7 +87,23 @@ export class MembersController {
         member_id: member.id,
       },
     };
-    return this.reservationsService.create(enrichedDto);
+    const reservation = await this.reservationsService.create(enrichedDto);
+
+    // Send confirmation email (fire-and-forget)
+    try {
+      const service = await this.servicesService.findOne(dto.service_id);
+      this.mailService.sendReservationConfirmation({
+        to: member.email,
+        customerName: `${member.first_name} ${member.last_name}`,
+        serviceName: service.name,
+        slotStart: reservation.slotStart,
+        slotEnd: reservation.slotEnd,
+        timezone: service.timezone,
+        reservationId: reservation.id,
+      });
+    } catch { /* non-critical */ }
+
+    return reservation;
   }
 
   @UseGuards(MemberJwtGuard)

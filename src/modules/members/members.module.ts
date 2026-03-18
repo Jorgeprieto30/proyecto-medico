@@ -7,6 +7,8 @@ import { MembersService } from './members.service';
 import { MembersController } from './members.controller';
 import { MemberJwtStrategy } from './strategies/member-jwt.strategy';
 import { ReservationsModule } from '../reservations/reservations.module';
+import { MailModule } from '../mail/mail.module';
+import { ServicesModule } from '../services/services.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { ReservationsModule } from '../reservations/reservations.module';
       signOptions: { expiresIn: '30d' },
     }),
     ReservationsModule,
+    MailModule,
+    ServicesModule,
   ],
   controllers: [MembersController],
   providers: [MembersService, MemberJwtStrategy],

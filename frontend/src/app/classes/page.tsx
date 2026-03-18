@@ -6,10 +6,10 @@ import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Clock, Globe, CalendarPlus } from 'lucide-react';
+import { Plus, Pencil, Trash2, Clock, Globe, CalendarPlus, Eye } from 'lucide-react';
 
 import { servicesApi, rulesApi, blocksApi } from '@/lib/api';
-import type { Service } from '@/types';
+import type { Service, ScheduleRule, ScheduleBlock } from '@/types';
 import { DAY_NAMES, todayAsString } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -67,6 +67,7 @@ export default function EventosPage() {
   const qc = useQueryClient();
   const [createOpen, setCreateOpen]       = useState(false);
   const [editServiceId, setEditServiceId] = useState<string | null>(null);
+  const [viewServiceId, setViewServiceId] = useState<string | null>(null);
   const [bookingService, setBookingService] = useState<Service | null>(null);
   const [deleteId, setDeleteId]           = useState<string | null>(null);
 
@@ -167,6 +168,7 @@ export default function EventosPage() {
             <EventRow
               key={svc.id}
               service={svc}
+              onView={() => setViewServiceId(svc.id)}
               onEdit={() => setEditServiceId(svc.id)}
               onToggle={() => toggleMutation.mutate(svc)}
               toggling={toggleMutation.isPending}
@@ -305,6 +307,13 @@ export default function EventosPage() {
         </form>
       </Modal>
 
+      {/* Service detail modal */}
+      <ServiceDetailModal
+        serviceId={viewServiceId}
+        onClose={() => setViewServiceId(null)}
+        onEdit={(id) => { setViewServiceId(null); setEditServiceId(id); }}
+      />
+
       {/* Unified edit modal */}
       <UnifiedEditModal
         serviceId={editServiceId}
@@ -331,12 +340,136 @@ export default function EventosPage() {
   );
 }
 
+// ─── Service Detail Modal ─────────────────────────────────────────────────────
+
+function ServiceDetailModal({
+  serviceId,
+  onClose,
+  onEdit,
+}: {
+  serviceId: string | null;
+  onClose: () => void;
+  onEdit: (id: string) => void;
+}) {
+  const { data: services } = useQuery({ queryKey: ['services'], queryFn: servicesApi.list });
+  const service = services?.find((s) => s.id === serviceId);
+
+  const { data: rules = [] } = useQuery<ScheduleRule[]>({
+    queryKey: ['rules', serviceId],
+    queryFn: () => rulesApi.list(serviceId!),
+    enabled: !!serviceId,
+  });
+
+  const { data: blocks = [] } = useQuery<ScheduleBlock[]>({
+    queryKey: ['blocks', serviceId],
+    queryFn: () => blocksApi.list(serviceId!),
+    enabled: !!serviceId,
+  });
+
+  const allDays = [1, 2, 3, 4, 5, 6, 7];
+  const activeDays = Array.from(new Set(rules.filter((r) => r.isActive).map((r) => r.dayOfWeek))).sort();
+
+  return (
+    <Modal
+      open={!!serviceId}
+      onClose={onClose}
+      title={service?.name ?? ''}
+      description={service?.description ?? undefined}
+      className="max-w-lg"
+    >
+      {service && (
+        <div className="space-y-5">
+          {/* Info chips */}
+          <div className="flex flex-wrap gap-2">
+            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${service.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${service.isActive ? 'bg-green-500' : 'bg-gray-400'}`} />
+              {service.isActive ? 'Activo' : 'Inactivo'}
+            </span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+              <Clock className="h-3 w-3" />{service.slotDurationMinutes} min por slot
+            </span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+              <Globe className="h-3 w-3" />{service.timezone}
+            </span>
+          </div>
+
+          {/* Schedule */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">Horario semanal</h3>
+            {activeDays.length === 0 ? (
+              <p className="text-sm text-gray-400">Sin horarios configurados.</p>
+            ) : (
+              <div className="space-y-2">
+                {activeDays.map((day) => {
+                  const dayRules = rules.filter((r) => r.dayOfWeek === day && r.isActive);
+                  const dayBlocks = blocks.filter((b) => b.dayOfWeek === day && b.isActive);
+                  return (
+                    <div key={day} className="flex gap-3 items-start">
+                      <span className="shrink-0 w-8 text-xs font-semibold text-gray-500 pt-1">
+                        {DAY_NAMES[day].slice(0, 2)}
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {dayRules.map((r) => {
+                          const block = dayBlocks.find(
+                            (b) => b.startTime === r.startTime && b.endTime === r.endTime,
+                          );
+                          return (
+                            <span
+                              key={r.id}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 border border-blue-100 rounded-md text-xs text-blue-800"
+                            >
+                              {r.startTime}–{r.endTime}
+                              {block && (
+                                <span className="ml-1 font-semibold text-blue-600">{block.capacity} cupos</span>
+                              )}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Days pill row */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">Días activos</h3>
+            <div className="flex gap-1">
+              {allDays.map((d) => (
+                <span
+                  key={d}
+                  className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-medium ${
+                    activeDays.includes(d) ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-300'
+                  }`}
+                >
+                  {DAY_SHORT[d]}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" onClick={onClose}>Cerrar</Button>
+            <Button onClick={() => onEdit(service.id)}>
+              <Pencil className="h-3.5 w-3.5" />
+              Editar evento
+            </Button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 // ─── Event Row ────────────────────────────────────────────────────────────────
 
 function EventRow({
-  service, onEdit, onToggle, toggling, onDelete, onBook,
+  service, onView, onEdit, onToggle, toggling, onDelete, onBook,
 }: {
   service: Service;
+  onView: () => void;
   onEdit: () => void;
   onToggle: () => void;
   toggling: boolean;
@@ -360,7 +493,9 @@ function EventRow({
 
       {/* Name + description */}
       <div className="min-w-0 flex-1">
-        <p className="font-semibold text-gray-900 truncate">{service.name}</p>
+        <button onClick={onView} className="font-semibold text-gray-900 truncate hover:text-blue-600 text-left block w-full">
+          {service.name}
+        </button>
         {service.description && (
           <p className="text-xs text-gray-400 truncate mt-0.5">{service.description}</p>
         )}
@@ -422,6 +557,9 @@ function EventRow({
             Reservar
           </Button>
         )}
+        <Button size="sm" variant="outline" onClick={onView} className="gap-1.5" title="Ver detalle">
+          <Eye className="h-3.5 w-3.5" />
+        </Button>
         <Button size="sm" variant="outline" onClick={onEdit} className="gap-1.5">
           <Pencil className="h-3.5 w-3.5" />
           Editar

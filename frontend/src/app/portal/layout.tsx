@@ -38,9 +38,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 >
                   Mis reservas
                 </Link>
-                <span className="text-sm text-gray-700 font-medium hidden sm:inline">
+                <Link
+                  href="/portal/perfil"
+                  className="text-sm text-gray-700 font-medium hover:text-blue-600 transition-colors hidden sm:inline"
+                >
                   {profile.first_name} {profile.last_name}
-                </span>
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="text-sm text-gray-500 hover:text-red-600 transition-colors"

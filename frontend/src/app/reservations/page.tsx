@@ -3,11 +3,36 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { TrendingUp, CalendarCheck, Clock, XCircle, Plus, X, Activity } from 'lucide-react';
+import { TrendingUp, CalendarCheck, Clock, XCircle, Plus, X, Activity, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 
 import { servicesApi, reservationsApi } from '@/lib/api';
 import type { Reservation } from '@/types';
 import { formatDateTime, getStatusLabel, todayAsString } from '@/lib/utils';
+import type { Service } from '@/types';
+
+const PAGE_SIZE = 20;
+
+function exportCsv(reservations: ReturnType<typeof Array.prototype.filter>, services: Service[] | undefined) {
+  const header = ['#', 'Evento', 'Cliente', 'RUT', 'Fecha', 'Estado'];
+  const rows = reservations.map((r: any) => [
+    r.id,
+    services?.find((s) => s.id === r.serviceId)?.name ?? r.serviceId,
+    r.customerName ?? '',
+    r.customerExternalId ?? '',
+    formatDateTime(r.slotStart),
+    getStatusLabel(r.status),
+  ]);
+  const csv = [header, ...rows].map((row) => row.map((c) => `"${c}"`).join(',')).join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `reservas_${todayAsString()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -59,6 +84,7 @@ export default function ActivityPage() {
   const today = todayAsString();
 
   const [rangeDays, setRangeDays] = useState(30);
+  const [page, setPage] = useState(0);
   const [cancelling, setCancelling] = useState<Reservation | null>(null);
 
   const rangeStart = changeDate(today, -rangeDays + 1);
@@ -135,12 +161,13 @@ export default function ActivityPage() {
 
   const maxCount = Math.max(...chartData.map((d) => d.count), 1);
 
-  // Recent activity (last 20, sorted by slotStart desc)
-  const recent = useMemo(() => {
-    return [...(inRange)]
-      .sort((a, b) => b.slotStart.localeCompare(a.slotStart))
-      .slice(0, 20);
+  // Recent activity sorted by slotStart desc
+  const sortedInRange = useMemo(() => {
+    return [...inRange].sort((a, b) => b.slotStart.localeCompare(a.slotStart));
   }, [inRange]);
+
+  const totalPages = Math.ceil(sortedInRange.length / PAGE_SIZE);
+  const recent = sortedInRange.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const canCancel = (r: Reservation) => r.status === 'confirmed' || r.status === 'pending';
 
@@ -166,7 +193,7 @@ export default function ActivityPage() {
         {[7, 14, 30, 90].map((d) => (
           <button
             key={d}
-            onClick={() => setRangeDays(d)}
+            onClick={() => { setRangeDays(d); setPage(0); }}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
               rangeDays === d
                 ? 'bg-blue-600 text-white border-blue-600'
@@ -246,7 +273,18 @@ export default function ActivityPage() {
       <div className="bg-white border rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b flex items-center justify-between">
           <h2 className="text-sm font-semibold text-gray-700">Actividad reciente</h2>
-          <span className="text-xs text-gray-400">{recent.length} reservas en el período</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-gray-400">{sortedInRange.length} reservas en el período</span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => exportCsv(sortedInRange, services)}
+              className="gap-1.5 text-xs"
+            >
+              <Download className="h-3.5 w-3.5" />
+              CSV
+            </Button>
+          </div>
         </div>
 
         {recent.length === 0 ? (
@@ -298,6 +336,24 @@ export default function ActivityPage() {
               ))}
             </tbody>
           </table>
+        )}
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-5 py-3 border-t">
+            <span className="text-xs text-gray-400">
+              Página {page + 1} de {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+                <ChevronLeft className="h-4 w-4" />
+                Anterior
+              </Button>
+              <Button size="sm" variant="outline" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
+                Siguiente
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         )}
       </div>
 

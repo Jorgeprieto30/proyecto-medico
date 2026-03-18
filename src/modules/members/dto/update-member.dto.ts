@@ -19,3 +19,15 @@ export class UpdateMemberDto {
   @IsString()
   rut?: string;
 }
+
+export class ChangePasswordDto {
+  @ApiPropertyOptional()
+  @IsString()
+  @MinLength(1)
+  current_password: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @MinLength(6)
+  new_password: string;
+}

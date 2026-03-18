@@ -22,7 +22,8 @@
       "WebFetch(domain:cieden.com)",
       "WebFetch(domain:www.eleken.co)",
       "WebFetch(domain:baymard.com)",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "Bash(npx tsc:*)"
     ]
   }
 }
