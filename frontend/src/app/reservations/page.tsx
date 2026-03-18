@@ -86,19 +86,25 @@ export default function ActivityPage() {
 
   // ── Derived stats ────────────────────────────────────────────────────────────
 
+  // All reservations from rangeStart onwards (past + future) for the list
   const inRange = useMemo(() => {
     if (!allReservations) return [];
     return allReservations.filter((r) => {
       const d = r.slotStart.split('T')[0];
-      return d >= rangeStart && d <= today;
+      return d >= rangeStart;
     });
-  }, [allReservations, rangeStart, today]);
+  }, [allReservations, rangeStart]);
+
+  // Only past reservations for stats (up to today)
+  const inRangePast = useMemo(() => {
+    return inRange.filter((r) => r.slotStart.split('T')[0] <= today);
+  }, [inRange, today]);
 
   const stats = useMemo(() => {
-    const confirmed  = inRange.filter((r) => r.status === 'confirmed').length;
-    const pending    = inRange.filter((r) => r.status === 'pending').length;
-    const cancelled  = inRange.filter((r) => r.status === 'cancelled').length;
-    return { total: inRange.length, confirmed, pending, cancelled };
+    const confirmed  = inRangePast.filter((r) => r.status === 'confirmed').length;
+    const pending    = inRangePast.filter((r) => r.status === 'pending').length;
+    const cancelled  = inRangePast.filter((r) => r.status === 'cancelled').length;
+    return { total: inRangePast.length, confirmed, pending, cancelled };
   }, [inRange]);
 
   // Reservations per service
