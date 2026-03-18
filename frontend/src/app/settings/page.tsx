@@ -7,7 +7,7 @@ import { Plus, Trash2, Copy, Check, KeyRound, Eye, EyeOff, Building2, Link2 } fr
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { getSession } from 'next-auth/react';
+import { getSession, signOut } from 'next-auth/react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,7 +31,10 @@ async function apiFetch(path: string, options: RequestInit = {}) {
     ...options,
   });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.message || `Error ${res.status}`);
+  if (!res.ok) {
+    if (res.status === 401) signOut({ callbackUrl: '/login' });
+    throw new Error(json.message || `Error ${res.status}`);
+  }
   return json.data ?? json;
 }
 

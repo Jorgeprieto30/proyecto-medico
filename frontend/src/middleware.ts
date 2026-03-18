@@ -2,7 +2,7 @@ export { default } from 'next-auth/middleware';
 
 export const config = {
   matcher: [
-    // Proteger todas las rutas excepto login, register y assets
-    '/((?!login|register|api/auth|_next/static|_next/image|favicon.ico).*)',
+    // Proteger rutas del panel admin; excluir auth, portal y assets
+    '/((?!login|register|api/auth|portal|_next/static|_next/image|favicon.ico).*)',
   ],
 };

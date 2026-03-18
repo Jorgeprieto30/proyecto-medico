@@ -1,4 +1,4 @@
-import { getSession } from 'next-auth/react';
+import { getSession, signOut } from 'next-auth/react';
 import type {
   ApiResponse,
   Service, CreateServiceDto, UpdateServiceDto,
@@ -39,6 +39,9 @@ async function request<T>(
   const json = await res.json().catch(() => ({}));
 
   if (!res.ok) {
+    if (res.status === 401) {
+      signOut({ callbackUrl: '/login' });
+    }
     const msg = Array.isArray(json.message)
       ? json.message.join(', ')
       : json.message || `Error ${res.status}`;
