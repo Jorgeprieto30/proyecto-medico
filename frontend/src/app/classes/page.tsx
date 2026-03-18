@@ -185,7 +185,7 @@ export default function EventosPage() {
         description="Configura el nombre, duración, días y horarios del nuevo evento."
         className="max-w-2xl"
       >
-        <form onSubmit={handleSubmit((d) => createMutation.mutate(d))} className="space-y-5">
+        <form onSubmit={handleSubmit((d) => { if (!createMutation.isPending) createMutation.mutate(d); })} className="space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <Label>Nombre del evento *</Label>
@@ -426,12 +426,11 @@ function EventRow({
           <Pencil className="h-3.5 w-3.5" />
           Editar
         </Button>
-        {!service.isActive && (
-          <Button size="sm" variant="ghost" onClick={onDelete}
-            className="text-red-500 hover:text-red-700 hover:bg-red-50">
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
+        <Button size="sm" variant="ghost" onClick={onDelete}
+          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+          title="Eliminar evento">
+          <Trash2 className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   );
