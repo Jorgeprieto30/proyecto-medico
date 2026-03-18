@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 
 import { availabilityApi, reservationsApi } from '@/lib/api';
 import type { SlotAvailability, Service } from '@/types';
+import { validateRut } from '@/lib/utils';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,7 +28,11 @@ const WEEKDAY_SHORT = ['Lu','Ma','Mi','Ju','Vi','Sá','Do'];
 
 const reserveSchema = z.object({
   customer_name:        z.string().min(1, 'Nombre requerido'),
-  customer_external_id: z.string().optional(),
+  customer_email:       z.string().email('Email inválido').optional().or(z.literal('')),
+  customer_external_id: z.string().optional().refine(
+    (v) => !v || validateRut(v),
+    { message: 'RUT inválido (ej: 12.345.678-9)' },
+  ),
 });
 type ReserveForm = z.infer<typeof reserveSchema>;
 
@@ -132,6 +137,7 @@ export function BookingModal({
         slot_start: selectedSlot!.slot_start,
         customer_name: data.customer_name,
         customer_external_id: data.customer_external_id || undefined,
+        metadata: data.customer_email ? { email: data.customer_email } : undefined,
       }),
     onSuccess: () => {
       toast.success('Reserva creada correctamente');
@@ -343,8 +349,14 @@ export function BookingModal({
               {errors.customer_name && <p className="text-xs text-red-500 mt-1">{errors.customer_name.message}</p>}
             </div>
             <div>
-              <Label>RUT / ID (opcional)</Label>
+              <Label>Email (opcional)</Label>
+              <Input type="email" {...register('customer_email')} className="mt-1" placeholder="ej: juan@mail.com" />
+              {errors.customer_email && <p className="text-xs text-red-500 mt-1">{errors.customer_email.message}</p>}
+            </div>
+            <div>
+              <Label>RUT (opcional)</Label>
               <Input {...register('customer_external_id')} className="mt-1" placeholder="ej: 12.345.678-9" />
+              {errors.customer_external_id && <p className="text-xs text-red-500 mt-1">{errors.customer_external_id.message}</p>}
             </div>
             <Button type="submit" className="w-full" disabled={reserveMutation.isPending}>
               {reserveMutation.isPending ? 'Reservando...' : 'Confirmar reserva'}

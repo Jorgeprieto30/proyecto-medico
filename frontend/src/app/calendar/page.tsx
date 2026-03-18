@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 
 import { servicesApi, availabilityApi, reservationsApi } from '@/lib/api';
 import type { SlotAvailability } from '@/types';
-import { todayAsString } from '@/lib/utils';
+import { todayAsString, validateRut } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -638,7 +638,11 @@ function YearView({ date, onSelectDate }: { date: string; onSelectDate: (d: stri
 
 const reserveSchema = z.object({
   customer_name:        z.string().min(1, 'Nombre requerido'),
-  customer_external_id: z.string().optional(),
+  customer_email:       z.string().email('Email inválido').optional().or(z.literal('')),
+  customer_external_id: z.string().optional().refine(
+    (v) => !v || validateRut(v),
+    { message: 'RUT inválido (ej: 12.345.678-9)' },
+  ),
 });
 type ReserveForm = z.infer<typeof reserveSchema>;
 
@@ -671,6 +675,7 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
         slot_start: slot.slot_start,
         customer_name: data.customer_name,
         customer_external_id: data.customer_external_id || undefined,
+        metadata: data.customer_email ? { email: data.customer_email } : undefined,
       }),
     onSuccess: () => {
       toast.success('Reserva creada correctamente');
@@ -678,6 +683,18 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
       setShowForm(false);
       qc.invalidateQueries({ queryKey: ['slot-reservations', slot.serviceId, date] });
       qc.invalidateQueries({ queryKey: ['calendar'] });
+      qc.invalidateQueries({ queryKey: ['reservations-all'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (id: number) => reservationsApi.cancel(id),
+    onSuccess: () => {
+      toast.success('Reserva cancelada');
+      qc.invalidateQueries({ queryKey: ['slot-reservations', slot.serviceId, date] });
+      qc.invalidateQueries({ queryKey: ['calendar'] });
+      qc.invalidateQueries({ queryKey: ['reservations-all'] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -733,8 +750,10 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="px-3 py-2 text-left font-medium text-gray-500">Nombre</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">RUT / ID</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">RUT</th>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">Email</th>
                   <th className="px-3 py-2 text-left font-medium text-gray-500">Estado</th>
+                  <th className="px-3 py-2" />
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -742,12 +761,23 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
                   <tr key={r.id} className="hover:bg-gray-50">
                     <td className="px-3 py-2 text-gray-800">{r.customerName ?? '—'}</td>
                     <td className="px-3 py-2 font-mono text-gray-500">{r.customerExternalId ?? '—'}</td>
+                    <td className="px-3 py-2 text-gray-500">{(r.metadata as any)?.email ?? '—'}</td>
                     <td className="px-3 py-2">
                       <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${
                         r.status === 'confirmed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                       }`}>
                         {r.status === 'confirmed' ? 'Confirmado' : 'Pendiente'}
                       </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <button
+                        onClick={() => cancelMutation.mutate(r.id)}
+                        disabled={cancelMutation.isPending}
+                        title="Cancelar reserva"
+                        className="text-red-400 hover:text-red-600 disabled:opacity-40 transition-colors"
+                      >
+                        ✕
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -779,8 +809,14 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
               {errors.customer_name && <p className="text-xs text-red-500 mt-0.5">{errors.customer_name.message}</p>}
             </div>
             <div>
-              <Label className="text-xs">RUT / ID (opcional)</Label>
+              <Label className="text-xs">Email (opcional)</Label>
+              <Input type="email" {...register('customer_email')} className="mt-1 h-8 text-sm" placeholder="ej: juan@mail.com" />
+              {errors.customer_email && <p className="text-xs text-red-500 mt-0.5">{errors.customer_email.message}</p>}
+            </div>
+            <div>
+              <Label className="text-xs">RUT (opcional)</Label>
               <Input {...register('customer_external_id')} className="mt-1 h-8 text-sm" placeholder="ej: 12.345.678-9" />
+              {errors.customer_external_id && <p className="text-xs text-red-500 mt-0.5">{errors.customer_external_id.message}</p>}
             </div>
             <div className="flex gap-2 pt-1">
               <Button type="submit" className="flex-1" disabled={reserveMutation.isPending}>

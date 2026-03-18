@@ -99,3 +99,20 @@ export function getStatusLabel(status: string): string {
 export function todayAsString(): string {
   return new Date().toISOString().split('T')[0];
 }
+
+/** Valida RUT chileno (acepta formatos: 12345678-9, 12.345.678-9, 123456789) */
+export function validateRut(rut: string): boolean {
+  const clean = rut.replace(/[.\-\s]/g, '').toUpperCase();
+  if (clean.length < 2) return false;
+  const body = clean.slice(0, -1);
+  const dv   = clean.slice(-1);
+  if (!/^\d+$/.test(body)) return false;
+  let sum = 0, mul = 2;
+  for (let i = body.length - 1; i >= 0; i--) {
+    sum += parseInt(body[i], 10) * mul;
+    mul = mul === 7 ? 2 : mul + 1;
+  }
+  const rem      = sum % 11;
+  const expected = rem === 0 ? '0' : rem === 1 ? 'K' : String(11 - rem);
+  return dv === expected;
+}
