@@ -6,15 +6,18 @@ import { toast } from 'sonner';
 import { TrendingUp, CalendarCheck, Clock, XCircle, Plus, X, Activity, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 
 import { servicesApi, reservationsApi } from '@/lib/api';
-import type { Reservation } from '@/types';
+import type { Reservation, Service } from '@/types';
 import { formatDateTime, getStatusLabel, todayAsString } from '@/lib/utils';
-import type { Service } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { PageSpinner } from '@/components/ui/spinner';
 
 const PAGE_SIZE = 20;
 
-function exportCsv(reservations: ReturnType<typeof Array.prototype.filter>, services: Service[] | undefined) {
+function exportCsv(reservations: Reservation[], services: Service[] | undefined) {
   const header = ['#', 'Evento', 'Cliente', 'RUT', 'Fecha', 'Estado'];
-  const rows = reservations.map((r: any) => [
+  const rows = reservations.map((r) => [
     r.id,
     services?.find((s) => s.id === r.serviceId)?.name ?? r.serviceId,
     r.customerName ?? '',
@@ -33,10 +36,6 @@ function exportCsv(reservations: ReturnType<typeof Array.prototype.filter>, serv
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { PageSpinner } from '@/components/ui/spinner';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -131,7 +130,7 @@ export default function ActivityPage() {
     const pending    = inRangePast.filter((r) => r.status === 'pending').length;
     const cancelled  = inRangePast.filter((r) => r.status === 'cancelled').length;
     return { total: inRangePast.length, confirmed, pending, cancelled };
-  }, [inRange]);
+  }, [inRangePast]);
 
   // Reservations per service
   const byService = useMemo(() => {
