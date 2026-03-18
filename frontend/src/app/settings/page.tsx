@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, Trash2, Copy, Check, KeyRound, Eye, EyeOff, Building2 } from 'lucide-react';
-import { useForm } from 'react-hook-form';
+import { Plus, Trash2, Copy, Check, KeyRound, Eye, EyeOff, Building2, Link2 } from 'lucide-react';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { getSession } from 'next-auth/react';
@@ -52,12 +52,17 @@ type FormData = z.infer<typeof schema>;
 
 const centerSchema = z.object({
   center_name: z.string().optional(),
-  center_code: z
-    .string()
-    .regex(/^[a-z0-9-]*$/, 'Solo letras minúsculas, números y guiones')
-    .optional(),
 });
 type CenterFormData = z.infer<typeof centerSchema>;
+
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')   // remove accents
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
 
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
@@ -121,18 +126,27 @@ export default function SettingsPage() {
   const {
     register: registerCenter,
     handleSubmit: handleSubmitCenter,
+    control: centerControl,
     formState: { errors: centerErrors },
   } = useForm<CenterFormData>({
     resolver: zodResolver(centerSchema),
     values: {
       center_name: userProfile?.center_name ?? '',
-      center_code: userProfile?.center_code ?? '',
     },
   });
 
+  const watchedName = useWatch({ control: centerControl, name: 'center_name' }) ?? '';
+  const previewCode = slugify(watchedName) || userProfile?.center_code || '';
+
   const centerMutation = useMutation({
     mutationFn: (data: CenterFormData) =>
-      apiFetch('/users/me', { method: 'PATCH', body: JSON.stringify(data) }),
+      apiFetch('/users/me', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          center_name: data.center_name,
+          center_code: slugify(data.center_name ?? ''),
+        }),
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['user-me'] });
       toast.success('Perfil del centro actualizado');
@@ -196,24 +210,32 @@ export default function SettingsPage() {
                 <p className="text-xs text-red-500 mt-1">{centerErrors.center_name.message}</p>
               )}
             </div>
+
+            {/* Código — solo lectura, generado automáticamente */}
             <div>
-              <Label htmlFor="center_code">Código del centro</Label>
-              <Input
-                id="center_code"
-                {...registerCenter('center_code')}
-                className="mt-1"
-                placeholder="ej: clases-jorge"
-              />
-              {centerErrors.center_code && (
-                <p className="text-xs text-red-500 mt-1">{centerErrors.center_code.message}</p>
-              )}
-              <p className="text-xs text-gray-400 mt-1">
-                Se usa en la URL pública:{' '}
-                <code className="bg-gray-100 px-1 rounded">
-                  /portal/{userProfile?.center_code || 'tu-codigo'}
+              <Label>Código del centro</Label>
+              <div className="mt-1 flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg bg-gray-50">
+                <code className="flex-1 text-sm text-gray-700 font-mono">
+                  {previewCode || <span className="text-gray-300 font-sans">Se generará al guardar</span>}
                 </code>
+                {previewCode && <CopyButton value={previewCode} />}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Generado automáticamente a partir del nombre.
               </p>
             </div>
+
+            {/* URL pública */}
+            {previewCode && (
+              <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                <Link2 className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                <span className="text-xs text-blue-700 font-mono flex-1 truncate">
+                  /portal/{previewCode}
+                </span>
+                <CopyButton value={`/portal/${previewCode}`} />
+              </div>
+            )}
+
             <div className="flex justify-end">
               <Button type="submit" disabled={centerMutation.isPending}>
                 {centerMutation.isPending ? 'Guardando...' : 'Guardar'}
