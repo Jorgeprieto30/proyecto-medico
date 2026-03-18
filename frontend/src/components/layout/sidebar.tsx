@@ -9,17 +9,15 @@ import {
   ClipboardList,
   Dumbbell,
   KeyRound,
-  LayoutDashboard,
   LogOut,
   Settings2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/reservations', label: 'Actividad', icon: ClipboardList },
   { href: '/classes', label: 'Eventos', icon: Dumbbell },
   { href: '/calendar', label: 'Calendario', icon: CalendarDays },
-  { href: '/reservations', label: 'Actividad', icon: ClipboardList },
   { href: '/api-docs', label: 'API Docs', icon: BookOpen },
   { href: '/settings', label: 'Configuración', icon: KeyRound },
 ];
@@ -31,7 +29,7 @@ export function Sidebar() {
   return (
     <aside className="fixed inset-y-0 left-0 z-50 w-60 bg-[#0d1526] flex flex-col">
       {/* Logo */}
-      <div className="flex items-center gap-3 px-5 py-4 border-b border-[#1e3052]">
+      <Link href="/reservations" className="flex items-center gap-3 px-5 py-4 border-b border-[#1e3052] hover:opacity-80 transition-opacity">
         {/* Mini campus calendar icon */}
         <div className="relative w-9 h-9 shrink-0">
           <div className="absolute bottom-0 right-0 w-7 h-7 rounded-lg bg-blue-400/30 border border-blue-400/50" />
@@ -56,13 +54,12 @@ export function Sidebar() {
         >
           campus
         </span>
-      </div>
+      </Link>
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1">
         {navItems.map(({ href, label, icon: Icon }) => {
-          const active =
-            href === '/' ? pathname === '/' : pathname.startsWith(href);
+          const active = pathname.startsWith(href);
           return (
             <Link
               key={href}
