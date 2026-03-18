@@ -29,6 +29,12 @@ export class User {
   @Column({ default: 'admin' })
   role: string;
 
+  @Column({ name: 'center_name', type: 'varchar', length: 255, nullable: true })
+  center_name: string | null;
+
+  @Column({ name: 'center_code', type: 'varchar', length: 100, nullable: true, unique: true })
+  center_code: string | null;
+
   @CreateDateColumn()
   created_at: Date;
 

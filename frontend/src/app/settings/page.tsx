@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, Trash2, Copy, Check, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { Plus, Trash2, Copy, Check, KeyRound, Eye, EyeOff, Building2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -49,6 +49,15 @@ const schema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
 });
 type FormData = z.infer<typeof schema>;
+
+const centerSchema = z.object({
+  center_name: z.string().optional(),
+  center_code: z
+    .string()
+    .regex(/^[a-z0-9-]*$/, 'Solo letras minúsculas, números y guiones')
+    .optional(),
+});
+type CenterFormData = z.infer<typeof centerSchema>;
 
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
@@ -100,8 +109,35 @@ export default function SettingsPage() {
     queryFn: () => apiFetch('/api-keys'),
   });
 
+  const { data: userProfile } = useQuery<{ center_name: string | null; center_code: string | null }>({
+    queryKey: ['user-me'],
+    queryFn: () => apiFetch('/users/me'),
+  });
+
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
+  });
+
+  const {
+    register: registerCenter,
+    handleSubmit: handleSubmitCenter,
+    formState: { errors: centerErrors },
+  } = useForm<CenterFormData>({
+    resolver: zodResolver(centerSchema),
+    values: {
+      center_name: userProfile?.center_name ?? '',
+      center_code: userProfile?.center_code ?? '',
+    },
+  });
+
+  const centerMutation = useMutation({
+    mutationFn: (data: CenterFormData) =>
+      apiFetch('/users/me', { method: 'PATCH', body: JSON.stringify(data) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['user-me'] });
+      toast.success('Perfil del centro actualizado');
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const createMutation = useMutation({
@@ -134,6 +170,58 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Configuración</h1>
         <p className="text-gray-500 text-sm mt-1">Administra las claves de acceso a la API</p>
       </div>
+
+      {/* Sección Perfil del Centro */}
+      <Card>
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-5 w-5 text-gray-600" />
+            <CardTitle className="text-base">Perfil del Centro</CardTitle>
+          </div>
+          <p className="text-sm text-gray-500 mt-1">
+            Configura cómo aparece tu centro en el portal público de reservas.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmitCenter((d) => centerMutation.mutate(d))} className="space-y-4 max-w-md">
+            <div>
+              <Label htmlFor="center_name">Nombre del centro</Label>
+              <Input
+                id="center_name"
+                {...registerCenter('center_name')}
+                className="mt-1"
+                placeholder="ej: Clases Particulares Jorge"
+              />
+              {centerErrors.center_name && (
+                <p className="text-xs text-red-500 mt-1">{centerErrors.center_name.message}</p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="center_code">Código del centro</Label>
+              <Input
+                id="center_code"
+                {...registerCenter('center_code')}
+                className="mt-1"
+                placeholder="ej: clases-jorge"
+              />
+              {centerErrors.center_code && (
+                <p className="text-xs text-red-500 mt-1">{centerErrors.center_code.message}</p>
+              )}
+              <p className="text-xs text-gray-400 mt-1">
+                Se usa en la URL pública:{' '}
+                <code className="bg-gray-100 px-1 rounded">
+                  /portal/{userProfile?.center_code || 'tu-codigo'}
+                </code>
+              </p>
+            </div>
+            <div className="flex justify-end">
+              <Button type="submit" disabled={centerMutation.isPending}>
+                {centerMutation.isPending ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
       {/* Sección API Keys */}
       <Card>

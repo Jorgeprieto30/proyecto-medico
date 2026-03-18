@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Service } from '../../services/entities/service.entity';
+import { Member } from '../../members/entities/member.entity';
 
 export enum ReservationStatus {
   CONFIRMED = 'confirmed',
@@ -56,6 +57,14 @@ export class Reservation {
   @ApiPropertyOptional({ example: 'client_123', nullable: true })
   @Column({ name: 'customer_external_id', type: 'varchar', nullable: true, length: 255 })
   customerExternalId: string | null;
+
+  @ApiPropertyOptional({ example: '550e8400-e29b-41d4-a716-446655440000', nullable: true })
+  @Column({ name: 'member_id', type: 'uuid', nullable: true })
+  memberId: string | null;
+
+  @ManyToOne(() => Member, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'member_id' })
+  member: Member | null;
 
   @ApiPropertyOptional({ example: { source: 'internal' }, nullable: true })
   @Column({ type: 'jsonb', nullable: true })

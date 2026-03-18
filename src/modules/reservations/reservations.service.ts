@@ -81,6 +81,8 @@ export class ReservationsService {
         );
       }
 
+      const memberId: string | null =
+        typeof dto.metadata?.member_id === 'string' ? dto.metadata.member_id : null;
       const reservation = manager.getRepository(Reservation).create({
         serviceId: dto.service_id,
         slotStart: slotStartUtc,
@@ -88,6 +90,7 @@ export class ReservationsService {
         status: ReservationStatus.CONFIRMED,
         customerName: dto.customer_name ?? null,
         customerExternalId: dto.customer_external_id ?? null,
+        memberId,
         metadata: dto.metadata ?? null,
       });
 
@@ -145,5 +148,14 @@ export class ReservationsService {
       throw new NotFoundException(`Reserva con id ${id} no encontrada`);
     }
     return reservation;
+  }
+
+  async findByMemberId(memberId: string): Promise<Reservation[]> {
+    return this.reservationRepo
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.service', 's')
+      .where('r.member_id = :memberId', { memberId })
+      .orderBy('r.slot_start', 'DESC')
+      .getMany();
   }
 }

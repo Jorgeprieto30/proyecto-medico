@@ -8,6 +8,8 @@ import { AvailabilityModule } from './modules/availability/availability.module';
 import { ReservationsModule } from './modules/reservations/reservations.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module';
+import { MembersModule } from './modules/members/members.module';
+import { PublicModule } from './modules/public/public.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { ApiKeysModule } from './modules/api-keys/api-keys.module';
     ExceptionsModule,
     AvailabilityModule,
     ReservationsModule,
+    MembersModule,
+    PublicModule,
   ],
 })
 export class AppModule {}
