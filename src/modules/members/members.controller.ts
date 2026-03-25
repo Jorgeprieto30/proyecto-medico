@@ -45,6 +45,7 @@ export class MembersController {
     return this.membersService.login(dto);
   }
 
+  @Public()
   @UseGuards(MemberJwtGuard)
   @Get('me')
   @ApiBearerAuth()
@@ -53,6 +54,7 @@ export class MembersController {
     return member;
   }
 
+  @Public()
   @UseGuards(MemberJwtGuard)
   @Patch('me')
   @ApiBearerAuth()
@@ -61,6 +63,7 @@ export class MembersController {
     return this.membersService.updateProfile(member.id, dto);
   }
 
+  @Public()
   @UseGuards(MemberJwtGuard)
   @Patch('me/password')
   @HttpCode(200)
@@ -70,6 +73,7 @@ export class MembersController {
     return this.membersService.changePassword(member.id, dto);
   }
 
+  @Public()
   @UseGuards(MemberJwtGuard)
   @Post('reservations')
   @ApiBearerAuth()
@@ -106,6 +110,7 @@ export class MembersController {
     return reservation;
   }
 
+  @Public()
   @UseGuards(MemberJwtGuard)
   @Get('reservations')
   @ApiBearerAuth()
