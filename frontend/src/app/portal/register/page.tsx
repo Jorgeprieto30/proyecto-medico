@@ -73,7 +73,7 @@ function RegisterForm() {
       }
       const data = json.data ?? json;
       memberLogin(data.access_token, data.member);
-      router.push(redirect);
+      window.location.href = redirect;
     } catch {
       setServerError('Error de conexión. Intenta nuevamente.');
     } finally {
