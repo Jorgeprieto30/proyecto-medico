@@ -1,8 +1,21 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Calendar, Clock, ChevronLeft, ChevronRight, X } from 'lucide-react';
+
+const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const WEEKDAY_SHORT = ['Lu','Ma','Mi','Ju','Vi','Sá','Do'];
+
+function daysInMonth(y: number, m: number) { return new Date(y, m + 1, 0).getDate(); }
+function firstDow(y: number, m: number) { const d = new Date(y, m, 1).getDay(); return d === 0 ? 6 : d - 1; }
+function toDateStr(y: number, m: number, d: number) {
+  return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+function dotColor(available: number, capacity: number) {
+  if (available === 0) return 'bg-red-400';
+  return available / capacity <= 0.25 ? 'bg-orange-400' : 'bg-green-400';
+}
 import { getMemberToken, getMemberProfile, type MemberProfile } from '@/lib/member-auth';
 import { formatSlotDate, formatSlotTime, todayAsString } from '@/lib/utils';
 
@@ -96,6 +109,11 @@ function BookingModal({
   onConfirm: (slot: Slot, spotNumber: number, name: string, rut: string) => Promise<void>;
   memberProfile: MemberProfile | null;
 }) {
+  const today = todayAsString();
+  const todayDate = new Date(today + 'T12:00:00');
+  const [year, setYear] = useState(todayDate.getFullYear());
+  const [month, setMonth] = useState(todayDate.getMonth());
+  const [monthData, setMonthData] = useState<Record<string, { available: number; capacity: number }> | null>(null);
   const [date, setDate] = useState(booking.date);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -138,6 +156,31 @@ function BookingModal({
       setLoadingSpots(false);
     }
   }, [booking.service.id]);
+
+  const allDays = useMemo(
+    () => Array.from({ length: daysInMonth(year, month) }, (_, i) => toDateStr(year, month, i + 1)),
+    [year, month],
+  );
+
+  useEffect(() => {
+    if (step !== 'date') return;
+    setMonthData(null);
+    let cancelled = false;
+    (async () => {
+      const results: Record<string, { available: number; capacity: number }> = {};
+      await Promise.all(allDays.map(async (d) => {
+        if (d < today) return;
+        try {
+          const slotsData = await apiFetch(`/public/availability?service_id=${booking.service.id}&date=${d}`);
+          const available = slotsData.reduce((s: number, sl: Slot) => s + sl.available, 0);
+          const capacity  = slotsData.reduce((s: number, sl: Slot) => s + sl.capacity,  0);
+          if (capacity > 0) results[d] = { available, capacity };
+        } catch { /* no slots */ }
+      }));
+      if (!cancelled) setMonthData(results);
+    })();
+    return () => { cancelled = true; };
+  }, [step, year, month, allDays, booking.service.id, today]);
 
   useEffect(() => {
     if (step === 'slot') loadSlots(date);
@@ -198,34 +241,69 @@ function BookingModal({
         </div>
 
         <div className="flex-1 overflow-y-auto p-5">
-          {/* Step 1: Date */}
+          {/* Step 1: Date — calendar */}
           {step === 'date' && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between mb-2">
+              {/* Month nav */}
+              <div className="flex items-center justify-between">
                 <button
-                  onClick={() => setDate(addDays(date, -1))}
-                  disabled={date <= todayAsString()}
-                  className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-30"
+                  onClick={() => { if (month === 0) { setYear(y => y-1); setMonth(11); } else setMonth(m => m-1); }}
+                  className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
                 >
-                  <ChevronLeft className="h-5 w-5" />
+                  <ChevronLeft className="h-4 w-4 text-gray-600" />
                 </button>
-                <input
-                  type="date"
-                  value={date}
-                  min={todayAsString()}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <span className="text-sm font-semibold text-gray-800">{MONTH_NAMES[month]} {year}</span>
                 <button
-                  onClick={() => setDate(addDays(date, 1))}
-                  className="p-2 rounded-lg hover:bg-gray-100"
+                  onClick={() => { if (month === 11) { setYear(y => y+1); setMonth(0); } else setMonth(m => m+1); }}
+                  className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
                 >
-                  <ChevronRight className="h-5 w-5" />
+                  <ChevronRight className="h-4 w-4 text-gray-600" />
                 </button>
               </div>
-              <p className="text-sm text-gray-500 text-center">
-                {formatSlotDate(`${date}T12:00:00`, booking.service.timezone)}
-              </p>
+              {/* Weekday headers */}
+              <div className="grid grid-cols-7">
+                {WEEKDAY_SHORT.map(d => (
+                  <div key={d} className="text-center text-xs font-medium text-gray-400 py-1">{d}</div>
+                ))}
+              </div>
+              {/* Day cells */}
+              <div className="grid grid-cols-7 gap-y-1">
+                {Array.from({ length: firstDow(year, month) }, (_, i) => <div key={`e${i}`} />)}
+                {allDays.map((dateStr) => {
+                  const dayNum = parseInt(dateStr.split('-')[2], 10);
+                  const isPast = dateStr < today;
+                  const isSelected = dateStr === date;
+                  const info = monthData?.[dateStr];
+                  const noSlots = !!monthData && !info;
+                  const disabled = isPast || noSlots;
+                  return (
+                    <button
+                      key={dateStr}
+                      disabled={disabled}
+                      onClick={() => { setDate(dateStr); setStep('slot'); }}
+                      className={`flex flex-col items-center py-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed
+                        ${isSelected ? 'bg-blue-600 text-white' : !disabled ? 'hover:bg-gray-100 text-gray-700' : 'text-gray-700'}
+                      `}
+                    >
+                      <span className="text-sm leading-none">{dayNum}</span>
+                      {info && !isPast ? (
+                        <span className={`mt-1 w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : dotColor(info.available, info.capacity)}`} />
+                      ) : (
+                        <span className="mt-1 w-1.5 h-1.5" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Legend */}
+              {monthData && (
+                <div className="flex items-center gap-4 text-xs text-gray-400 pt-1 border-t">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400 inline-block" />Disponible</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />Casi lleno</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400 inline-block" />Sin cupos</span>
+                </div>
+              )}
+              {!monthData && <p className="text-center text-xs text-gray-400 pt-2">Cargando disponibilidad...</p>}
             </div>
           )}
 
@@ -374,35 +452,35 @@ function BookingModal({
         </div>
 
         {/* Footer */}
-        <div className="p-5 border-t flex justify-between">
-          <button
-            onClick={() => {
-              if (step === 'date') onClose();
-              else if (step === 'slot') setStep('date');
-              else if (step === 'spot') setStep('slot');
-              else if (step === 'confirm') setStep('spot');
-            }}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg hover:bg-gray-50"
-          >
-            {step === 'date' ? 'Cancelar' : 'Atrás'}
-          </button>
-          <button
-            disabled={
-              (step === 'slot' && !selectedSlot) ||
-              (step === 'spot' && selectedSpot === null) ||
-              (step === 'confirm' && (!customerName.trim() || confirming))
-            }
-            onClick={() => {
-              if (step === 'date') setStep('slot');
-              else if (step === 'slot' && selectedSlot) setStep('spot');
-              else if (step === 'spot' && selectedSpot !== null) setStep('confirm');
-              else if (step === 'confirm') handleConfirm();
-            }}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {step === 'confirm' ? (confirming ? 'Confirmando...' : 'Confirmar reserva') : 'Siguiente'}
-          </button>
-        </div>
+        {step !== 'date' && (
+          <div className="p-5 border-t flex justify-between">
+            <button
+              onClick={() => {
+                if (step === 'slot') setStep('date');
+                else if (step === 'spot') setStep('slot');
+                else if (step === 'confirm') setStep('spot');
+              }}
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg hover:bg-gray-50"
+            >
+              Atrás
+            </button>
+            <button
+              disabled={
+                (step === 'slot' && !selectedSlot) ||
+                (step === 'spot' && selectedSpot === null) ||
+                (step === 'confirm' && (!customerName.trim() || confirming))
+              }
+              onClick={() => {
+                if (step === 'slot' && selectedSlot) setStep('spot');
+                else if (step === 'spot' && selectedSpot !== null) setStep('confirm');
+                else if (step === 'confirm') handleConfirm();
+              }}
+              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {step === 'confirm' ? (confirming ? 'Confirmando...' : 'Confirmar reserva') : 'Siguiente'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
