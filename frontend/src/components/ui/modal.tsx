@@ -20,11 +20,11 @@ export function Modal({ open, onClose, title, description, children, className }
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50 animate-in fade-in" />
         <Dialog.Content
           className={cn(
-            'fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white shadow-xl p-6 animate-in fade-in zoom-in-95',
+            'fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white shadow-xl animate-in fade-in zoom-in-95 flex flex-col max-h-[90vh]',
             className,
           )}
         >
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between p-6 pb-4 flex-shrink-0">
             <div>
               <Dialog.Title className="text-lg font-semibold text-gray-900">
                 {title}
@@ -42,7 +42,9 @@ export function Modal({ open, onClose, title, description, children, className }
               <X className="h-4 w-4" />
             </button>
           </div>
-          {children}
+          <div className="overflow-y-auto px-6 pb-6 flex-1">
+            {children}
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
