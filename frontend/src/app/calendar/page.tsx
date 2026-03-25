@@ -674,9 +674,10 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
     (r) => new Date(r.slotStart).getTime() === slotTs && r.status !== 'cancelled',
   ) ?? [];
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<ReserveForm>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ReserveForm>({
     resolver: zodResolver(reserveSchema),
   });
+  const selectedSpotNumber = watch('spot_number');
 
   const reserveMutation = useMutation({
     mutationFn: (data: ReserveForm) =>
@@ -876,15 +877,30 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
           </div>
           <form onSubmit={handleSubmit((d) => reserveMutation.mutate(d))} className="space-y-3">
             <div>
-              <Label className="text-xs">{spotLabel ?? 'Cupo'} # *</Label>
-              <Input
-                type="number"
-                min={1}
-                max={slot.capacity}
-                {...register('spot_number')}
-                className="mt-1 h-8 text-sm"
-                placeholder={`1 – ${slot.capacity}`}
-              />
+              <Label className="text-xs">Selecciona {spotLabel ? `una ${spotLabel}` : 'un cupo'} *</Label>
+              <div className="mt-1.5 grid grid-cols-5 gap-1.5">
+                {Array.from({ length: slot.capacity }, (_, i) => i + 1).map((n) => {
+                  const taken = slotReservations.some((r) => r.spotNumber === n);
+                  const isSelected = Number(selectedSpotNumber) === n;
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      disabled={taken}
+                      onClick={() => setValue('spot_number', n, { shouldValidate: true })}
+                      className={`h-9 rounded-lg text-xs font-semibold border transition-all
+                        ${taken
+                          ? 'bg-red-50 border-red-200 text-red-300 cursor-not-allowed'
+                          : isSelected
+                          ? 'bg-blue-600 border-blue-600 text-white'
+                          : 'bg-white border-gray-200 text-gray-700 hover:border-blue-400 hover:bg-blue-50'
+                        }`}
+                    >
+                      {spotLabel ? `${spotLabel[0]}${n}` : n}
+                    </button>
+                  );
+                })}
+              </div>
               {errors.spot_number && <p className="text-xs text-red-500 mt-0.5">{errors.spot_number.message}</p>}
             </div>
             <div>
