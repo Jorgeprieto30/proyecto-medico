@@ -8,8 +8,8 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Clock, Globe, CalendarPlus, Eye } from 'lucide-react';
 
-import { servicesApi, rulesApi, blocksApi } from '@/lib/api';
-import type { Service, ScheduleRule, ScheduleBlock } from '@/types';
+import { servicesApi, rulesApi } from '@/lib/api';
+import type { Service, ScheduleRule } from '@/types';
 import { DAY_NAMES, todayAsString } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,7 +39,6 @@ const DAY_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
 const timeSlotSchema = z.object({
   startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Formato HH:MM'),
   endTime:   z.string().regex(/^\d{2}:\d{2}$/, 'Formato HH:MM'),
-  capacity:  z.coerce.number().min(1, 'Mínimo 1'),
 });
 
 const createSchema = z.object({
@@ -50,7 +49,7 @@ const createSchema = z.object({
   maxSpots:            z.coerce.number().min(1, 'Mínimo 1').max(500, 'Máximo 500'),
   spotLabel:           z.string().optional(),
   days:                z.array(z.number()).min(1, 'Selecciona al menos un día'),
-  timeSlots:           z.array(timeSlotSchema).min(1, 'Agrega al menos un horario'),
+  timeSlots: z.array(timeSlotSchema).min(1, 'Agrega al menos un horario'),
   validFrom:           z.string().optional(),
   validUntil:          z.string().optional(),
 });
@@ -60,7 +59,7 @@ const DEFAULT_CREATE: CreateForm = {
   name: '', description: '', timezone: 'America/Santiago',
   slotDurationMinutes: 60, maxSpots: 20, spotLabel: '',
   days: [],
-  timeSlots: [{ startTime: '08:00', endTime: '09:00', capacity: 5 }],
+  timeSlots: [{ startTime: '08:00', endTime: '09:00' }],
   validFrom: todayAsString(), validUntil: '',
 };
 
@@ -110,9 +109,6 @@ export default function EventosPage() {
           await rulesApi.create(svc.id, {
             dayOfWeek: day, startTime: slot.startTime, endTime: slot.endTime,
             validFrom: data.validFrom || undefined, validUntil: data.validUntil || undefined,
-          });
-          await blocksApi.create(svc.id, {
-            dayOfWeek: day, startTime: slot.startTime, endTime: slot.endTime, capacity: slot.capacity,
           });
         }
       }
@@ -265,7 +261,7 @@ export default function EventosPage() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <Label>Horarios *</Label>
-              <button type="button" onClick={() => appendSlot({ startTime: '', endTime: '', capacity: 5 })}
+              <button type="button" onClick={() => appendSlot({ startTime: '', endTime: '' })}
                 className="text-xs text-blue-600 hover:underline flex items-center gap-1">
                 <Plus className="h-3 w-3" /> Añadir horario
               </button>
@@ -273,7 +269,7 @@ export default function EventosPage() {
             <div className="space-y-2">
               {slotFields.map((field, idx) => (
                 <div key={field.id} className="flex items-start gap-2 p-3 border rounded-lg bg-gray-50">
-                  <div className="flex-1 grid grid-cols-3 gap-2">
+                  <div className="flex-1 grid grid-cols-2 gap-2">
                     <div>
                       <Label className="text-xs text-gray-500">Inicio</Label>
                       <Input type="time" {...register(`timeSlots.${idx}.startTime`)} className="mt-0.5 h-8 text-sm" />
@@ -281,10 +277,6 @@ export default function EventosPage() {
                     <div>
                       <Label className="text-xs text-gray-500">Fin</Label>
                       <Input type="time" {...register(`timeSlots.${idx}.endTime`)} className="mt-0.5 h-8 text-sm" />
-                    </div>
-                    <div>
-                      <Label className="text-xs text-gray-500">Cupos</Label>
-                      <Input type="number" min={1} {...register(`timeSlots.${idx}.capacity`)} className="mt-0.5 h-8 text-sm" placeholder="5" />
                     </div>
                   </div>
                   {slotFields.length > 1 && (
@@ -378,12 +370,6 @@ function ServiceDetailModal({
     enabled: !!serviceId,
   });
 
-  const { data: blocks = [] } = useQuery<ScheduleBlock[]>({
-    queryKey: ['blocks', serviceId],
-    queryFn: () => blocksApi.list(serviceId!),
-    enabled: !!serviceId,
-  });
-
   const allDays = [1, 2, 3, 4, 5, 6, 7];
   const activeDays = Array.from(new Set(rules.filter((r) => r.isActive).map((r) => r.dayOfWeek))).sort();
 
@@ -423,29 +409,20 @@ function ServiceDetailModal({
               <div className="space-y-2">
                 {activeDays.map((day) => {
                   const dayRules = rules.filter((r) => r.dayOfWeek === day && r.isActive);
-                  const dayBlocks = blocks.filter((b) => b.dayOfWeek === day && b.isActive);
                   return (
                     <div key={day} className="flex gap-3 items-start">
                       <span className="shrink-0 w-8 text-xs font-semibold text-gray-500 pt-1">
                         {DAY_NAMES[day].slice(0, 2)}
                       </span>
                       <div className="flex flex-wrap gap-1.5">
-                        {dayRules.map((r) => {
-                          const block = dayBlocks.find(
-                            (b) => b.startTime === r.startTime && b.endTime === r.endTime,
-                          );
-                          return (
-                            <span
-                              key={r.id}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 border border-blue-100 rounded-md text-xs text-blue-800"
-                            >
-                              {r.startTime}–{r.endTime}
-                              {block && (
-                                <span className="ml-1 font-semibold text-blue-600">{block.capacity} cupos</span>
-                              )}
-                            </span>
-                          );
-                        })}
+                        {dayRules.map((r) => (
+                          <span
+                            key={r.id}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 border border-blue-100 rounded-md text-xs text-blue-800"
+                          >
+                            {r.startTime}–{r.endTime}
+                          </span>
+                        ))}
                       </div>
                     </div>
                   );
