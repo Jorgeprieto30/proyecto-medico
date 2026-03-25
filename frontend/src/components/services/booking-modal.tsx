@@ -27,6 +27,7 @@ const MONTH_NAMES = [
 const WEEKDAY_SHORT = ['Lu','Ma','Mi','Ju','Vi','Sá','Do'];
 
 const reserveSchema = z.object({
+  spot_number:          z.coerce.number().min(1, 'Selecciona un cupo'),
   customer_name:        z.string().min(1, 'Nombre requerido'),
   customer_email:       z.string().email('Email inválido').optional().or(z.literal('')),
   customer_external_id: z.string().optional().refine(
@@ -135,6 +136,7 @@ export function BookingModal({
       reservationsApi.create({
         service_id: service!.id,
         slot_start: selectedSlot!.slot_start,
+        spot_number: data.spot_number,
         customer_name: data.customer_name,
         customer_external_id: data.customer_external_id || undefined,
         metadata: data.customer_email ? { email: data.customer_email } : undefined,
@@ -343,6 +345,18 @@ export function BookingModal({
           </div>
 
           <form onSubmit={handleSubmit((d) => reserveMutation.mutate(d))} className="space-y-4">
+            <div>
+              <Label>Número de cupo * {service?.spotLabel && `(${service.spotLabel})`}</Label>
+              <Input
+                type="number"
+                min={1}
+                max={selectedSlot.capacity}
+                {...register('spot_number')}
+                className="mt-1"
+                placeholder={`1 – ${selectedSlot.capacity}`}
+              />
+              {errors.spot_number && <p className="text-xs text-red-500 mt-1">{errors.spot_number.message}</p>}
+            </div>
             <div>
               <Label>Nombre del cliente *</Label>
               <Input {...register('customer_name')} className="mt-1" placeholder="ej: Juan Pérez" />

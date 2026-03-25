@@ -9,6 +9,7 @@ import { ChevronLeft, ChevronRight, Info, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { servicesApi, availabilityApi, reservationsApi } from '@/lib/api';
+import type { Service } from '@/types';
 import type { SlotAvailability } from '@/types';
 import { todayAsString, validateRut } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -643,6 +644,7 @@ const reserveSchema = z.object({
     (v) => !v || validateRut(v),
     { message: 'RUT inválido (ej: 12.345.678-9)' },
   ),
+  spot_number:          z.coerce.number().min(1, 'Selecciona un cupo'),
 });
 type ReserveForm = z.infer<typeof reserveSchema>;
 
@@ -651,8 +653,16 @@ type ReserveForm = z.infer<typeof reserveSchema>;
 function SlotDetail({ slot }: { slot: CalendarSlot }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [showOverrideForm, setShowOverrideForm] = useState(false);
+  const [overrideSpots, setOverrideSpots] = useState('');
+  const [savingOverride, setSavingOverride] = useState(false);
   const pct = slot.capacity > 0 ? (slot.reserved / slot.capacity) * 100 : 0;
   const date = slot.slot_start.split('T')[0];
+
+  // Load service details to get spotLabel
+  const { data: services = [] } = useQuery({ queryKey: ['services'], queryFn: servicesApi.list });
+  const service = services.find((s) => s.id === slot.serviceId);
+  const spotLabel = service?.spotLabel ?? null;
 
   const { data: allReservations, isLoading: loadingRes } = useQuery({
     queryKey: ['slot-reservations', slot.serviceId, date],
@@ -673,6 +683,7 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
       reservationsApi.create({
         service_id: slot.serviceId,
         slot_start: slot.slot_start,
+        spot_number: data.spot_number,
         customer_name: data.customer_name,
         customer_external_id: data.customer_external_id || undefined,
         metadata: data.customer_email ? { email: data.customer_email } : undefined,
@@ -687,6 +698,26 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const handleSaveOverride = async () => {
+    const n = parseInt(overrideSpots, 10);
+    if (isNaN(n) || n < 1) { toast.error('Número de cupos inválido'); return; }
+    setSavingOverride(true);
+    try {
+      await servicesApi.upsertSessionOverride(slot.serviceId, {
+        slot_start: slot.slot_start,
+        max_spots: n,
+      });
+      toast.success(`Cupos de esta sesión cambiados a ${n}`);
+      setShowOverrideForm(false);
+      setOverrideSpots('');
+      qc.invalidateQueries({ queryKey: ['calendar'] });
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSavingOverride(false);
+    }
+  };
 
   const cancelMutation = useMutation({
     mutationFn: (id: number) => reservationsApi.cancel(id),
@@ -735,6 +766,42 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
           : `${slot.available} cupos disponibles`}
       </div>
 
+      {/* Session override */}
+      <div className="border rounded-lg p-3 bg-gray-50">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-medium text-gray-600">
+              {spotLabel ? `${spotLabel}s` : 'Cupos'} de esta sesión
+            </p>
+            <p className="text-sm font-bold text-gray-900">{slot.capacity}</p>
+          </div>
+          <button
+            onClick={() => { setShowOverrideForm(!showOverrideForm); setOverrideSpots(String(slot.capacity)); }}
+            className="text-xs text-blue-600 hover:underline"
+          >
+            {showOverrideForm ? 'Cancelar' : 'Editar esta sesión'}
+          </button>
+        </div>
+        {showOverrideForm && (
+          <div className="mt-3 flex gap-2 items-end">
+            <div className="flex-1">
+              <Label className="text-xs">Nuevo máximo para esta sesión</Label>
+              <Input
+                type="number"
+                min={1}
+                max={500}
+                value={overrideSpots}
+                onChange={(e) => setOverrideSpots(e.target.value)}
+                className="mt-1 h-8 text-sm"
+              />
+            </div>
+            <Button size="sm" onClick={handleSaveOverride} disabled={savingOverride}>
+              {savingOverride ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </div>
+        )}
+      </div>
+
       {/* Registered people */}
       <div>
         <h3 className="text-sm font-semibold text-gray-700 mb-2">
@@ -749,19 +816,24 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
             <table className="w-full text-xs">
               <thead className="bg-gray-50 border-b">
                 <tr>
+                  <th className="px-3 py-2 text-left font-medium text-gray-500">{spotLabel ?? 'Cupo'}</th>
                   <th className="px-3 py-2 text-left font-medium text-gray-500">Nombre</th>
                   <th className="px-3 py-2 text-left font-medium text-gray-500">RUT</th>
-                  <th className="px-3 py-2 text-left font-medium text-gray-500">Email</th>
                   <th className="px-3 py-2 text-left font-medium text-gray-500">Estado</th>
                   <th className="px-3 py-2" />
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {slotReservations.map((r) => (
+                {slotReservations
+                  .slice()
+                  .sort((a, b) => (a.spotNumber ?? 0) - (b.spotNumber ?? 0))
+                  .map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2 font-bold text-blue-700">
+                      {r.spotNumber ?? '—'}
+                    </td>
                     <td className="px-3 py-2 text-gray-800">{r.customerName ?? '—'}</td>
                     <td className="px-3 py-2 font-mono text-gray-500">{r.customerExternalId ?? '—'}</td>
-                    <td className="px-3 py-2 text-gray-500">{(r.metadata as any)?.email ?? '—'}</td>
                     <td className="px-3 py-2">
                       <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${
                         r.status === 'confirmed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
@@ -803,6 +875,18 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
               className="text-xs text-gray-400 hover:text-gray-600">✕ Cancelar</button>
           </div>
           <form onSubmit={handleSubmit((d) => reserveMutation.mutate(d))} className="space-y-3">
+            <div>
+              <Label className="text-xs">{spotLabel ?? 'Cupo'} # *</Label>
+              <Input
+                type="number"
+                min={1}
+                max={slot.capacity}
+                {...register('spot_number')}
+                className="mt-1 h-8 text-sm"
+                placeholder={`1 – ${slot.capacity}`}
+              />
+              {errors.spot_number && <p className="text-xs text-red-500 mt-0.5">{errors.spot_number.message}</p>}
+            </div>
             <div>
               <Label className="text-xs">Nombre del cliente *</Label>
               <Input {...register('customer_name')} className="mt-1 h-8 text-sm" placeholder="ej: Juan Pérez" />

@@ -66,6 +66,10 @@ export class Reservation {
   @JoinColumn({ name: 'member_id' })
   member: Member | null;
 
+  @ApiPropertyOptional({ example: 5, nullable: true, description: 'Número de cupo elegido (1..max_spots)' })
+  @Column({ name: 'spot_number', type: 'int', nullable: true })
+  spotNumber: number | null;
+
   @ApiPropertyOptional({ example: { source: 'internal' }, nullable: true })
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any> | null;

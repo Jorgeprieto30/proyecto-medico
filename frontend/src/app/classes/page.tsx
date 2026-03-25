@@ -47,6 +47,8 @@ const createSchema = z.object({
   description:         z.string().optional(),
   timezone:            z.string().min(1),
   slotDurationMinutes: z.coerce.number().min(5).max(480),
+  maxSpots:            z.coerce.number().min(1, 'Mínimo 1').max(500, 'Máximo 500'),
+  spotLabel:           z.string().optional(),
   days:                z.array(z.number()).min(1, 'Selecciona al menos un día'),
   timeSlots:           z.array(timeSlotSchema).min(1, 'Agrega al menos un horario'),
   validFrom:           z.string().optional(),
@@ -56,7 +58,8 @@ type CreateForm = z.infer<typeof createSchema>;
 
 const DEFAULT_CREATE: CreateForm = {
   name: '', description: '', timezone: 'America/Santiago',
-  slotDurationMinutes: 60, days: [],
+  slotDurationMinutes: 60, maxSpots: 20, spotLabel: '',
+  days: [],
   timeSlots: [{ startTime: '08:00', endTime: '09:00', capacity: 5 }],
   validFrom: todayAsString(), validUntil: '',
 };
@@ -95,8 +98,12 @@ export default function EventosPage() {
   const createMutation = useMutation({
     mutationFn: async (data: CreateForm) => {
       const svc = await servicesApi.create({
-        name: data.name, description: data.description,
-        timezone: data.timezone, slotDurationMinutes: data.slotDurationMinutes,
+        name: data.name,
+        description: data.description,
+        timezone: data.timezone,
+        slotDurationMinutes: data.slotDurationMinutes,
+        maxSpots: data.maxSpots,
+        spotLabel: data.spotLabel || undefined,
       });
       for (const day of data.days) {
         for (const slot of data.timeSlots) {
@@ -211,6 +218,17 @@ export default function EventosPage() {
               <Label>Duración del slot (min) *</Label>
               <Input type="number" min={5} max={480} {...register('slotDurationMinutes')} className="mt-1" placeholder="60" />
               {errors.slotDurationMinutes && <p className="text-xs text-red-500 mt-1">{errors.slotDurationMinutes.message}</p>}
+            </div>
+            <div>
+              <Label>Cupos máximos por sesión *</Label>
+              <Input type="number" min={1} max={500} {...register('maxSpots')} className="mt-1" placeholder="20" />
+              <p className="text-xs text-gray-400 mt-0.5">Cantidad total de cupos numerados (ej: 20 bicicletas)</p>
+              {errors.maxSpots && <p className="text-xs text-red-500 mt-1">{errors.maxSpots.message}</p>}
+            </div>
+            <div className="col-span-2">
+              <Label>Etiqueta de cupo (opcional)</Label>
+              <Input {...register('spotLabel')} className="mt-1" placeholder='ej: "Bici" → muestra "Bici 1", "Bici 2"…' />
+              <p className="text-xs text-gray-400 mt-0.5">Si se deja vacío, se muestra solo el número</p>
             </div>
           </div>
 
@@ -387,6 +405,9 @@ function ServiceDetailModal({
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
               <Clock className="h-3 w-3" />{service.slotDurationMinutes} min por slot
+            </span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700">
+              {service.maxSpots} {service.spotLabel ? `${service.spotLabel}s` : 'cupos'}
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
               <Globe className="h-3 w-3" />{service.timezone}

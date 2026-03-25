@@ -20,6 +20,8 @@ interface Service {
   description: string | null;
   timezone: string;
   slotDurationMinutes: number;
+  maxSpots: number;
+  spotLabel: string | null;
   isActive: boolean;
 }
 
@@ -32,12 +34,27 @@ interface Slot {
   bookable: boolean;
 }
 
-type BookingStep = 'date' | 'slot' | 'confirm';
+interface SpotInfo {
+  number: number;
+  available: boolean;
+}
+
+interface SlotSpots {
+  service_id: string;
+  slot_start: string;
+  slot_end: string;
+  max_spots: number;
+  spot_label: string | null;
+  spots: SpotInfo[];
+}
+
+type BookingStep = 'date' | 'slot' | 'spot' | 'confirm';
 
 interface BookingState {
   service: Service;
   date: string;
   slot: Slot | null;
+  spotNumber: number | null;
   step: BookingStep;
 }
 
@@ -76,13 +93,16 @@ function BookingModal({
 }: {
   booking: BookingState;
   onClose: () => void;
-  onConfirm: (slot: Slot, name: string, rut: string) => Promise<void>;
+  onConfirm: (slot: Slot, spotNumber: number, name: string, rut: string) => Promise<void>;
   memberProfile: MemberProfile | null;
 }) {
   const [date, setDate] = useState(booking.date);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(booking.slot);
+  const [spotsData, setSpotsData] = useState<SlotSpots | null>(null);
+  const [loadingSpots, setLoadingSpots] = useState(false);
+  const [selectedSpot, setSelectedSpot] = useState<number | null>(booking.spotNumber);
   const [step, setStep] = useState<BookingStep>(booking.step);
   const [customerName, setCustomerName] = useState(
     memberProfile ? `${memberProfile.first_name} ${memberProfile.last_name}` : '',
@@ -105,22 +125,48 @@ function BookingModal({
     }
   }, [booking.service.id]);
 
+  const loadSpots = useCallback(async (slotStart: string) => {
+    setLoadingSpots(true);
+    try {
+      const data: SlotSpots = await apiFetch(
+        `/public/availability/spots?service_id=${booking.service.id}&slot_start=${encodeURIComponent(slotStart)}`,
+      );
+      setSpotsData(data);
+    } catch {
+      setSpotsData(null);
+    } finally {
+      setLoadingSpots(false);
+    }
+  }, [booking.service.id]);
+
   useEffect(() => {
     if (step === 'slot') loadSlots(date);
   }, [step, date, loadSlots]);
 
+  useEffect(() => {
+    if (step === 'spot' && selectedSlot) {
+      setSelectedSpot(null);
+      loadSpots(selectedSlot.slot_start);
+    }
+  }, [step, selectedSlot, loadSpots]);
+
   const handleConfirm = async () => {
-    if (!selectedSlot) return;
+    if (!selectedSlot || selectedSpot === null) return;
     setConfirming(true);
     setConfirmError('');
     try {
-      await onConfirm(selectedSlot, customerName, customerRut);
+      await onConfirm(selectedSlot, selectedSpot, customerName, customerRut);
     } catch (e: any) {
       setConfirmError(e.message || 'Error al confirmar la reserva');
     } finally {
       setConfirming(false);
     }
   };
+
+  const STEPS: BookingStep[] = ['date', 'slot', 'spot', 'confirm'];
+  const stepIdx = STEPS.indexOf(step);
+
+  const spotLabel = spotsData?.spot_label ?? booking.service.spotLabel;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
@@ -132,6 +178,7 @@ function BookingModal({
             <p className="text-xs text-gray-400 mt-0.5">
               {step === 'date' && 'Selecciona una fecha'}
               {step === 'slot' && 'Selecciona un horario'}
+              {step === 'spot' && `Elige tu ${spotLabel ?? 'cupo'}`}
               {step === 'confirm' && 'Confirma tu reserva'}
             </p>
           </div>
@@ -142,10 +189,10 @@ function BookingModal({
 
         {/* Step indicator */}
         <div className="flex px-5 pt-3 gap-2">
-          {(['date', 'slot', 'confirm'] as BookingStep[]).map((s, i) => (
+          {STEPS.map((s, i) => (
             <div
               key={s}
-              className={`flex-1 h-1 rounded-full ${step === s || (i < ['date', 'slot', 'confirm'].indexOf(step)) ? 'bg-blue-500' : 'bg-gray-100'}`}
+              className={`flex-1 h-1 rounded-full ${i <= stepIdx ? 'bg-blue-500' : 'bg-gray-100'}`}
             />
           ))}
         </div>
@@ -208,7 +255,9 @@ function BookingModal({
                       {formatSlotTime(slot.slot_start, booking.service.timezone)}
                     </p>
                     <p className="text-xs mt-0.5">
-                      {slot.available > 0 ? `${slot.available} cupo${slot.available > 1 ? 's' : ''}` : 'Sin cupos'}
+                      {slot.available > 0
+                        ? `${slot.available} ${spotLabel ? `${spotLabel.toLowerCase()}s` : 'cupos'} libres`
+                        : 'Sin cupos'}
                     </p>
                   </button>
                 ))}
@@ -216,8 +265,65 @@ function BookingModal({
             </div>
           )}
 
-          {/* Step 3: Confirm */}
-          {step === 'confirm' && selectedSlot && (
+          {/* Step 3: Spot selection */}
+          {step === 'spot' && (
+            <div>
+              <p className="text-sm text-gray-500 mb-1">
+                {formatSlotDate(`${date}T12:00:00`, booking.service.timezone)}
+                {selectedSlot && ` · ${formatSlotTime(selectedSlot.slot_start, booking.service.timezone)}`}
+              </p>
+              <p className="text-sm font-medium text-gray-700 mb-4">
+                Elige {spotLabel ? `tu ${spotLabel.toLowerCase()}` : 'un cupo'}
+              </p>
+              {loadingSpots && <p className="text-center text-gray-400 py-6">Cargando cupos...</p>}
+              {!loadingSpots && spotsData && (
+                <div className="grid grid-cols-5 gap-2">
+                  {spotsData.spots.map((spot) => (
+                    <button
+                      key={spot.number}
+                      disabled={!spot.available}
+                      onClick={() => setSelectedSpot(spot.number)}
+                      className={`aspect-square rounded-xl border-2 text-sm font-bold transition-all flex flex-col items-center justify-center gap-0.5 ${
+                        !spot.available
+                          ? 'bg-red-50 border-red-200 text-red-300 cursor-not-allowed'
+                          : selectedSpot === spot.number
+                          ? 'bg-blue-600 border-blue-600 text-white shadow-md scale-105'
+                          : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100 hover:border-green-400'
+                      }`}
+                    >
+                      {spotLabel && (
+                        <span className="text-[9px] font-normal opacity-70 leading-none">
+                          {spotLabel}
+                        </span>
+                      )}
+                      <span>{spot.number}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {!loadingSpots && !spotsData && (
+                <p className="text-center text-gray-400 py-6">Error al cargar los cupos.</p>
+              )}
+              {/* Legend */}
+              <div className="flex gap-4 mt-4 text-xs text-gray-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded bg-green-100 border border-green-300" />
+                  Disponible
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded bg-red-50 border border-red-200" />
+                  Ocupado
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded bg-blue-600" />
+                  Tu elección
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Confirm */}
+          {step === 'confirm' && selectedSlot && selectedSpot !== null && (
             <div className="space-y-4">
               <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
                 <p className="text-sm font-medium text-blue-900">{booking.service.name}</p>
@@ -225,8 +331,11 @@ function BookingModal({
                   {formatSlotDate(`${date}T12:00:00`, booking.service.timezone)}
                 </p>
                 <p className="text-sm text-blue-700">
-                  {formatSlotTime(selectedSlot.slot_start, booking.service.timezone)} -{' '}
+                  {formatSlotTime(selectedSlot.slot_start, booking.service.timezone)} –{' '}
                   {formatSlotTime(selectedSlot.slot_end, booking.service.timezone)}
+                </p>
+                <p className="text-sm font-semibold text-blue-800 mt-1">
+                  {spotLabel ? `${spotLabel} ${selectedSpot}` : `Cupo #${selectedSpot}`}
                 </p>
               </div>
 
@@ -270,7 +379,8 @@ function BookingModal({
             onClick={() => {
               if (step === 'date') onClose();
               else if (step === 'slot') setStep('date');
-              else if (step === 'confirm') setStep('slot');
+              else if (step === 'spot') setStep('slot');
+              else if (step === 'confirm') setStep('spot');
             }}
             className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg hover:bg-gray-50"
           >
@@ -279,11 +389,13 @@ function BookingModal({
           <button
             disabled={
               (step === 'slot' && !selectedSlot) ||
+              (step === 'spot' && selectedSpot === null) ||
               (step === 'confirm' && (!customerName.trim() || confirming))
             }
             onClick={() => {
               if (step === 'date') setStep('slot');
-              else if (step === 'slot' && selectedSlot) setStep('confirm');
+              else if (step === 'slot' && selectedSlot) setStep('spot');
+              else if (step === 'spot' && selectedSpot !== null) setStep('confirm');
               else if (step === 'confirm') handleConfirm();
             }}
             className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -343,10 +455,15 @@ export default function CenterPage() {
       return;
     }
     setSuccessMessage('');
-    setBooking({ service, date: todayAsString(), slot: null, step: 'date' });
+    setBooking({ service, date: todayAsString(), slot: null, spotNumber: null, step: 'date' });
   };
 
-  const handleConfirm = async (slot: Slot, customerName: string, customerRut: string) => {
+  const handleConfirm = async (
+    slot: Slot,
+    spotNumber: number,
+    customerName: string,
+    customerRut: string,
+  ) => {
     const token = getMemberToken();
     if (!token || !booking) throw new Error('No autenticado');
 
@@ -359,6 +476,7 @@ export default function CenterPage() {
       body: JSON.stringify({
         service_id: booking.service.id,
         slot_start: slot.slot_start,
+        spot_number: spotNumber,
         customer_name: customerName,
         customer_external_id: customerRut || undefined,
       }),
@@ -368,8 +486,13 @@ export default function CenterPage() {
       const msg = Array.isArray(json.message) ? json.message.join(', ') : json.message || 'Error al reservar';
       throw new Error(msg);
     }
+
+    const spotLabel = booking.service.spotLabel;
+    const spotStr = spotLabel ? `${spotLabel} ${spotNumber}` : `cupo #${spotNumber}`;
     setBooking(null);
-    setSuccessMessage(`Reserva confirmada para ${formatSlotDate(`${booking.date}T12:00:00`, booking.service.timezone)} a las ${formatSlotTime(slot.slot_start, booking.service.timezone)}`);
+    setSuccessMessage(
+      `Reserva confirmada: ${spotStr} el ${formatSlotDate(`${booking.date}T12:00:00`, booking.service.timezone)} a las ${formatSlotTime(slot.slot_start, booking.service.timezone)}`,
+    );
   };
 
   if (loading) {
@@ -439,7 +562,13 @@ export default function CenterPage() {
                         <Clock className="h-3.5 w-3.5" />
                         {service.slotDurationMinutes} min
                       </span>
-                      <span>{service.timezone}</span>
+                      <span>
+                        {service.maxSpots}{' '}
+                        {service.spotLabel
+                          ? `${service.spotLabel.toLowerCase()}s`
+                          : 'cupos'}{' '}
+                        por clase
+                      </span>
                     </div>
                   </div>
                   <button

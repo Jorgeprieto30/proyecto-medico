@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsObject, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsInt, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class CreateReservationDto {
   @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000', description: 'ID del servicio (UUID)' })
@@ -23,6 +23,11 @@ export class CreateReservationDto {
   @IsString()
   @IsOptional()
   customer_external_id?: string;
+
+  @ApiProperty({ example: 5, description: 'Número de cupo a reservar (1..max_spots del servicio)' })
+  @IsInt()
+  @Min(1)
+  spot_number: number;
 
   @ApiPropertyOptional({ example: { source: 'internal' } })
   @IsObject()

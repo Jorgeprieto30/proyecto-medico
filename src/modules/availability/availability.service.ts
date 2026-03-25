@@ -4,18 +4,17 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { DateTime } from 'luxon';
 import { ServicesService } from '../services/services.service';
 import { ScheduleRulesService } from '../schedule-rules/schedule-rules.service';
-import { ScheduleBlocksService } from '../schedule-blocks/schedule-blocks.service';
 import { ExceptionsService } from '../exceptions/exceptions.service';
 import { Reservation } from '../reservations/entities/reservation.entity';
 import { ReservationStatus } from '../reservations/entities/reservation.entity';
 import { SlotAvailabilityDto, SlotDetailDto } from './dto/availability.dto';
 import { ScheduleRule } from '../schedule-rules/entities/schedule-rule.entity';
-import { ScheduleBlock } from '../schedule-blocks/entities/schedule-block.entity';
 import { ServiceException } from '../exceptions/entities/service-exception.entity';
+import { SessionSpotOverridesService } from '../session-spot-overrides/session-spot-overrides.service';
 
 interface RawSlot {
   slotStart: DateTime;
@@ -26,15 +25,9 @@ interface RawSlot {
 /** Normaliza tiempos de la BD (que vienen como 'HH:MM:SS') a 'HH:MM' */
 function normalizeTime(t: string | null): string | null {
   if (!t) return null;
-  return t.substring(0, 5); // '08:00:00' → '08:00'
+  return t.substring(0, 5);
 }
 
-/**
- * Estados que consumen cupo.
- * - confirmed: siempre consume
- * - pending: consume temporalmente (evita que otro reserve mientras está pendiente)
- * - cancelled: NO consume
- */
 const ACTIVE_STATUSES: ReservationStatus[] = [
   ReservationStatus.CONFIRMED,
   ReservationStatus.PENDING,
@@ -47,14 +40,10 @@ export class AvailabilityService {
     private readonly reservationRepo: Repository<Reservation>,
     private readonly servicesService: ServicesService,
     private readonly rulesService: ScheduleRulesService,
-    private readonly blocksService: ScheduleBlocksService,
     private readonly exceptionsService: ExceptionsService,
+    private readonly sessionOverridesService: SessionSpotOverridesService,
   ) {}
 
-  /**
-   * Consulta disponibilidad completa de un día.
-   * Retorna todos los bloques válidos con su ocupación.
-   */
   async getAvailabilityByDate(
     serviceId: string,
     date: string,
@@ -65,11 +54,15 @@ export class AvailabilityService {
       throw new BadRequestException('date debe tener formato YYYY-MM-DD');
     }
 
-    const slots = await this.generateSlots(serviceId, date, service.timezone, service.slotDurationMinutes);
+    const slots = await this.generateSlots(
+      serviceId,
+      date,
+      service.timezone,
+      service.slotDurationMinutes,
+      service.maxSpots,
+    );
 
-    if (slots.length === 0) {
-      return [];
-    }
+    if (slots.length === 0) return [];
 
     const reservationCounts = await this.getReservationCountsBySlots(
       serviceId,
@@ -91,16 +84,12 @@ export class AvailabilityService {
     });
   }
 
-  /**
-   * Consulta disponibilidad de un bloque puntual.
-   */
   async getAvailabilityBySlot(
     serviceId: string,
     datetimeStr: string,
   ): Promise<SlotDetailDto> {
     const service = await this.servicesService.findOne(serviceId);
 
-    // Parsear el datetime con la zona horaria del servicio como fallback
     let requestedDt: DateTime;
     try {
       requestedDt = DateTime.fromISO(datetimeStr, { setZone: true });
@@ -109,17 +98,22 @@ export class AvailabilityService {
       throw new BadRequestException(`datetime inválido: ${datetimeStr}`);
     }
 
-    // Convertir al timezone del servicio para determinar la fecha local
     const localDt = requestedDt.setZone(service.timezone);
     const date = localDt.toISODate()!;
 
-    const slots = await this.generateSlots(serviceId, date, service.timezone, service.slotDurationMinutes);
+    const slots = await this.generateSlots(
+      serviceId,
+      date,
+      service.timezone,
+      service.slotDurationMinutes,
+      service.maxSpots,
+    );
 
-    // Buscar el slot que coincide con el datetime solicitado
-    const matchingSlot = slots.find((s) => {
-      return s.slotStart.toMillis() === requestedDt.toMillis() ||
-        s.slotStart.setZone(requestedDt.zoneName!).toISO() === requestedDt.toISO();
-    });
+    const matchingSlot = slots.find(
+      (s) =>
+        s.slotStart.toMillis() === requestedDt.toMillis() ||
+        s.slotStart.setZone(requestedDt.zoneName!).toISO() === requestedDt.toISO(),
+    );
 
     if (!matchingSlot) {
       return {
@@ -149,23 +143,94 @@ export class AvailabilityService {
   }
 
   /**
-   * Genera los slots válidos para una fecha.
-   * Aplica: reglas semanales → excepciones → bloques de capacidad.
+   * Devuelve los cupos numerados de una sesión específica.
+   * Cada cupo tiene número (1..max_spots) y si está disponible o tomado.
+   */
+  async getSpotsForSlot(
+    serviceId: string,
+    slotStartIso: string,
+  ): Promise<{
+    service_id: string;
+    slot_start: string;
+    slot_end: string;
+    max_spots: number;
+    spot_label: string | null;
+    spots: Array<{ number: number; available: boolean }>;
+  }> {
+    const service = await this.servicesService.findOne(serviceId);
+
+    let requestedDt: DateTime;
+    try {
+      requestedDt = DateTime.fromISO(slotStartIso, { setZone: true });
+      if (!requestedDt.isValid) throw new Error('Invalid');
+    } catch {
+      throw new BadRequestException(`slot_start inválido: ${slotStartIso}`);
+    }
+
+    const slotDetail = await this.getAvailabilityBySlot(serviceId, slotStartIso);
+    if (!slotDetail.exists) {
+      throw new NotFoundException(
+        `El slot ${slotStartIso} no existe o no está habilitado para el servicio ${serviceId}`,
+      );
+    }
+
+    // Determinar maxSpots efectivo (override de sesión o default del servicio)
+    const slotStartUtc = requestedDt.toUTC().toJSDate();
+    const override = await this.sessionOverridesService.findByServiceAndSlot(
+      serviceId,
+      slotStartUtc,
+    );
+    const maxSpots = override?.maxSpots ?? service.maxSpots;
+
+    // Cupos tomados (confirmed o pending)
+    const takenReservations = await this.reservationRepo.find({
+      where: {
+        serviceId,
+        slotStart: slotStartUtc,
+        status: In(ACTIVE_STATUSES),
+      },
+      select: ['spotNumber'],
+    });
+
+    const takenSet = new Set(
+      takenReservations
+        .map((r) => r.spotNumber)
+        .filter((n): n is number => n !== null),
+    );
+
+    const spots = Array.from({ length: maxSpots }, (_, i) => ({
+      number: i + 1,
+      available: !takenSet.has(i + 1),
+    }));
+
+    return {
+      service_id: serviceId,
+      slot_start: slotDetail.slot_start,
+      slot_end: slotDetail.slot_end,
+      max_spots: maxSpots,
+      spot_label: service.spotLabel,
+      spots,
+    };
+  }
+
+  /**
+   * Genera los slots válidos para una fecha usando max_spots como capacidad.
+   * Los bloques de horario ya no determinan la capacidad; cualquier slot
+   * dentro del rango de una regla es reservable con max_spots cupos.
    */
   async generateSlots(
     serviceId: string,
     date: string,
     timezone: string,
     slotDurationMinutes: number,
+    maxSpots: number,
   ): Promise<RawSlot[]> {
-    // 1. Determinar día de semana ISO (1=Lunes, 7=Domingo)
     const localDate = DateTime.fromISO(date, { zone: timezone });
     if (!localDate.isValid) {
       throw new BadRequestException(`Fecha inválida: ${date}`);
     }
-    const dayOfWeek = localDate.weekday; // Luxon: 1=Lunes, 7=Domingo
+    const dayOfWeek = localDate.weekday;
 
-    // 2. Cargar reglas activas para este día y filtrar por rango de vigencia
     const allRules = await this.rulesService.findActiveByServiceAndDay(serviceId, dayOfWeek);
     const rules = allRules.filter((r) => {
       if (r.validFrom && date < r.validFrom) return false;
@@ -173,71 +238,56 @@ export class AvailabilityService {
       return true;
     });
 
-    // 3. Cargar excepciones de la fecha
     const exceptions = await this.exceptionsService.findByServiceAndDate(serviceId, date);
 
-    // 4. Verificar cierre total del día (excepción sin tramo horario y is_closed=true)
-    const dayClosedException = exceptions.find(
-      (e) => e.isClosed && !e.startTime && !e.endTime,
+    const dayClosedException = exceptions.find((e) => e.isClosed && !e.startTime && !e.endTime);
+    if (dayClosedException) return [];
+
+    if (rules.length === 0) return [];
+
+    // Cargar overrides de sesión para este día (ventana UTC generosa)
+    const startUtc = localDate.toUTC().minus({ hours: 12 }).toJSDate();
+    const endUtc = localDate.toUTC().plus({ hours: 36 }).toJSDate();
+    const sessionOverrides = await this.sessionOverridesService.findByServiceAndDateRange(
+      serviceId,
+      startUtc,
+      endUtc,
     );
-    if (dayClosedException) {
-      return []; // Día cerrado completamente
+    const overrideMap: Record<string, number> = {};
+    for (const o of sessionOverrides) {
+      overrideMap[DateTime.fromJSDate(o.slotStart, { zone: 'UTC' }).toISO()!] = o.maxSpots;
     }
 
-    // 5. Si no hay reglas activas, no hay disponibilidad
-    if (rules.length === 0) {
-      return [];
-    }
-
-    // 6. Cargar bloques activos para este día
-    const blocks = await this.blocksService.findActiveByServiceAndDay(serviceId, dayOfWeek);
-
-    // 7. Generar slots para cada regla
     const allSlots: RawSlot[] = [];
-
     for (const rule of rules) {
       const ruleSlots = this.generateSlotsForRule(
         rule,
-        blocks,
         exceptions,
         localDate,
-        timezone,
         slotDurationMinutes,
+        maxSpots,
+        overrideMap,
       );
       allSlots.push(...ruleSlots);
     }
 
-    // Ordenar por hora de inicio
     allSlots.sort((a, b) => a.slotStart.toMillis() - b.slotStart.toMillis());
-
     return allSlots;
   }
 
-  /**
-   * Genera slots dentro de una regla semanal, aplicando excepciones y capacidad de bloques.
-   */
   private generateSlotsForRule(
     rule: ScheduleRule,
-    blocks: ScheduleBlock[],
     exceptions: ServiceException[],
     localDate: DateTime,
-    timezone: string,
     slotDurationMinutes: number,
+    defaultMaxSpots: number,
+    overrideMap: Record<string, number>,
   ): RawSlot[] {
     const slots: RawSlot[] = [];
 
-    // Obtener el rango efectivo del día (puede ser modificado por una excepción de rango)
-    // Normalizar: la BD devuelve TIME como 'HH:MM:SS', necesitamos 'HH:MM'
     let dayStartTime = normalizeTime(rule.startTime)!;
     let dayEndTime = normalizeTime(rule.endTime)!;
 
-    // Excepción de cambio de horario del día completo (is_closed=false, sin tramo, con start/end_time)
-    const dayRangeOverride = exceptions.find(
-      (e) => !e.isClosed && !e.startTime && !e.endTime && e.capacityOverride === null && e.reason,
-    );
-    // En realidad, para cambiar el horario del día, la excepción tendría start_time y end_time
-    // como nuevo horario. Si is_closed=false y no tiene tramo específico, es un override del día.
-    // Detectamos excepción de rango de día: is_closed=false, y startTime/endTime definen el nuevo rango
     const dayOverrideException = exceptions.find(
       (e) => !e.isClosed && e.startTime && e.endTime && !this.isSlotException(e),
     );
@@ -246,7 +296,6 @@ export class AvailabilityService {
       dayEndTime = normalizeTime(dayOverrideException.endTime)!;
     }
 
-    // Convertir las horas a DateTime en la zona local del servicio
     const [startH, startM] = dayStartTime.split(':').map(Number);
     const [endH, endM] = dayEndTime.split(':').map(Number);
 
@@ -255,8 +304,6 @@ export class AvailabilityService {
 
     while (current < dayEnd) {
       const slotEnd = current.plus({ minutes: slotDurationMinutes });
-
-      // No generar un slot que sobrepase el fin del día
       if (slotEnd > dayEnd) break;
 
       const slotStartTime = current.toFormat('HH:mm');
@@ -269,35 +316,19 @@ export class AvailabilityService {
         continue;
       }
 
-      // Buscar capacidad: primero en excepciones, luego en bloques
+      // Capacidad: excepción override → sesión override → default maxSpots
       const capacityFromException = this.findCapacityOverride(exceptions, slotStartTime, slotEndTime);
+      const slotStartUtcIso = current.toUTC().toISO()!;
+      const sessionOverrideCapacity = overrideMap[slotStartUtcIso] ?? null;
+      const capacity = capacityFromException ?? sessionOverrideCapacity ?? defaultMaxSpots;
 
-      let capacity: number | null = capacityFromException;
-
-      if (capacity === null) {
-        // Buscar en bloques configurados
-        const matchingBlock = this.findMatchingBlock(blocks, slotStartTime, slotEndTime);
-        capacity = matchingBlock ? matchingBlock.capacity : null;
-      }
-
-      // Solo agregar el slot si tiene capacidad configurada
-      if (capacity !== null && capacity > 0) {
-        slots.push({
-          slotStart: current,
-          slotEnd,
-          capacity,
-        });
-      }
-
+      slots.push({ slotStart: current, slotEnd, capacity });
       current = slotEnd;
     }
 
     return slots;
   }
 
-  /**
-   * Determina si una excepción aplica como "cierre" para un tramo específico.
-   */
   private findClosingException(
     exceptions: ServiceException[],
     slotStartTime: string,
@@ -312,9 +343,6 @@ export class AvailabilityService {
     });
   }
 
-  /**
-   * Busca capacidad override en las excepciones para un tramo específico.
-   */
   private findCapacityOverride(
     exceptions: ServiceException[],
     slotStartTime: string,
@@ -331,32 +359,10 @@ export class AvailabilityService {
     return override?.capacityOverride ?? null;
   }
 
-  /**
-   * Indica si una excepción tiene tramo horario específico (vs día completo).
-   */
   private isSlotException(exception: ServiceException): boolean {
     return !!(exception.startTime && exception.endTime);
   }
 
-  /**
-   * Encuentra el bloque configurado que contiene un slot específico.
-   */
-  private findMatchingBlock(
-    blocks: ScheduleBlock[],
-    slotStartTime: string,
-    slotEndTime: string,
-  ): ScheduleBlock | undefined {
-    return blocks.find((b) => {
-      const bStart = normalizeTime(b.startTime)!;
-      const bEnd = normalizeTime(b.endTime)!;
-      return bStart <= slotStartTime && bEnd >= slotEndTime;
-    });
-  }
-
-  /**
-   * Cuenta reservas activas agrupadas por slot_start.
-   * Retorna un mapa { slot_start_iso: count }
-   */
   private async getReservationCountsBySlots(
     serviceId: string,
     slotStarts: DateTime[],
@@ -377,9 +383,7 @@ export class AvailabilityService {
 
     const countMap: Record<string, number> = {};
     for (const row of results) {
-      // Comparar usando el timestamp UTC
       const slotDt = DateTime.fromJSDate(new Date(row.slotStart), { zone: 'UTC' });
-      // Buscar el slotStart original para usar su ISO como clave
       const matchingInput = slotStarts.find(
         (s) => Math.abs(s.toMillis() - slotDt.toMillis()) < 1000,
       );
@@ -391,10 +395,6 @@ export class AvailabilityService {
     return countMap;
   }
 
-  /**
-   * Valida y retorna la información de un slot para usarla en la creación de una reserva.
-   * Retorna null si el slot no existe o no tiene cupos disponibles.
-   */
   async validateSlotForReservation(
     serviceId: string,
     slotStartUtc: Date,
@@ -409,6 +409,7 @@ export class AvailabilityService {
       date,
       service.timezone,
       service.slotDurationMinutes,
+      service.maxSpots,
     );
 
     const matchingSlot = slots.find(

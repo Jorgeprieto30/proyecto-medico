@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param, Query } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
 import { UsersService } from '../users/users.service';
@@ -27,10 +27,8 @@ export class PublicController {
   async getCenterServices(@Param('code') code: string) {
     const admin = await this.usersService.findByCenterCode(code);
     if (!admin) return [];
-    // Get all services and filter by admin user — we need to add userId to Service
-    // For now: return all services (multi-tenant filtering is done via center lookup)
-    const allServices = await this.servicesService.findAll();
-    return allServices.filter((s) => s.isActive);
+    const services = await this.servicesService.findAll(admin.id);
+    return services.filter((s) => s.isActive);
   }
 
   @Get('availability')
@@ -42,5 +40,16 @@ export class PublicController {
     @Query('date') date: string,
   ) {
     return this.availabilityService.getAvailabilityByDate(serviceId, date);
+  }
+
+  @Get('availability/spots')
+  @ApiOperation({ summary: 'Consultar cupos numerados de una sesión (público)' })
+  @ApiQuery({ name: 'service_id', type: String })
+  @ApiQuery({ name: 'slot_start', type: String, example: '2026-03-20T14:00:00.000Z' })
+  async getSpots(
+    @Query('service_id') serviceId: string,
+    @Query('slot_start') slotStart: string,
+  ) {
+    return this.availabilityService.getSpotsForSlot(serviceId, slotStart);
   }
 }

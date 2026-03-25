@@ -5,17 +5,17 @@ import { AvailabilityService } from './availability.service';
 import { AvailabilityController } from './availability.controller';
 import { ServicesModule } from '../services/services.module';
 import { ScheduleRulesModule } from '../schedule-rules/schedule-rules.module';
-import { ScheduleBlocksModule } from '../schedule-blocks/schedule-blocks.module';
 import { ExceptionsModule } from '../exceptions/exceptions.module';
 import { ReservationsModule } from '../reservations/reservations.module';
+import { SessionSpotOverridesModule } from '../session-spot-overrides/session-spot-overrides.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Reservation]),
     ServicesModule,
     ScheduleRulesModule,
-    ScheduleBlocksModule,
     ExceptionsModule,
+    SessionSpotOverridesModule,
     forwardRef(() => ReservationsModule),
   ],
   controllers: [AvailabilityController],

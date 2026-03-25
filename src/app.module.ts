@@ -10,12 +10,14 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { MembersModule } from './modules/members/members.module';
 import { PublicModule } from './modules/public/public.module';
+import { SessionSpotOverridesModule } from './modules/session-spot-overrides/session-spot-overrides.module';
 
 @Module({
   imports: [
     DatabaseModule,
     AuthModule,
     ApiKeysModule,
+    SessionSpotOverridesModule,
     ServicesModule,
     ScheduleRulesModule,
     ScheduleBlocksModule,

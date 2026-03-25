@@ -5,8 +5,9 @@ import type {
   ScheduleRule, CreateScheduleRuleDto, UpdateScheduleRuleDto,
   ScheduleBlock, CreateScheduleBlockDto, UpdateScheduleBlockDto,
   ServiceException, CreateExceptionDto, UpdateExceptionDto,
-  SlotAvailability, SlotDetail,
+  SlotAvailability, SlotDetail, SlotSpots,
   Reservation, CreateReservationDto,
+  SessionSpotOverride,
 } from '@/types';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
@@ -48,7 +49,6 @@ async function request<T>(
     throw new ApiError(res.status, msg, json);
   }
 
-  // Backend wraps responses in { data, timestamp }
   return (json.data ?? json) as T;
 }
 
@@ -62,6 +62,16 @@ export const servicesApi = {
     request<Service>(`/services/${id}`, { method: 'PATCH', body: JSON.stringify(dto) }),
   delete: (id: string) =>
     request<void>(`/services/${id}`, { method: 'DELETE' }),
+  upsertSessionOverride: (id: string, dto: { slot_start: string; max_spots: number }) =>
+    request<SessionSpotOverride>(`/services/${id}/session-overrides`, {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    }),
+  deleteSessionOverride: (id: string, slot_start: string) =>
+    request<void>(`/services/${id}/session-overrides`, {
+      method: 'DELETE',
+      body: JSON.stringify({ slot_start }),
+    }),
 };
 
 // ─── Schedule Rules ───────────────────────────────────────────────────────────
@@ -127,6 +137,10 @@ export const availabilityApi = {
   bySlot: (serviceId: string, datetime: string) =>
     request<SlotDetail>(
       `/availability/slot?service_id=${serviceId}&datetime=${encodeURIComponent(datetime)}`,
+    ),
+  spots: (serviceId: string, slotStart: string) =>
+    request<SlotSpots>(
+      `/availability/spots?service_id=${serviceId}&slot_start=${encodeURIComponent(slotStart)}`,
     ),
 };
 

@@ -7,7 +7,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { DateTime } from 'luxon';
 import { Reservation, ReservationStatus } from './entities/reservation.entity';
 import { CreateReservationDto } from './dto/create-reservation.dto';
@@ -30,8 +30,8 @@ export class ReservationsService {
   ) {}
 
   /**
-   * Crea una reserva de forma atómica y segura contra condiciones de carrera.
-   * Usa pg_advisory_xact_lock para serializar acceso concurrente al mismo slot.
+   * Crea una reserva con cupo numerado.
+   * Usa pg_advisory_xact_lock para serializar acceso concurrente al mismo cupo/slot.
    */
   async create(dto: CreateReservationDto): Promise<Reservation> {
     await this.servicesService.findOne(dto.service_id);
@@ -57,32 +57,40 @@ export class ReservationsService {
       );
     }
 
+    // Validar que spot_number esté dentro del rango de cupos
+    if (dto.spot_number < 1 || dto.spot_number > slotInfo.capacity) {
+      throw new BadRequestException(
+        `Cupo ${dto.spot_number} inválido. Rango permitido: 1–${slotInfo.capacity}`,
+      );
+    }
+
     return this.dataSource.transaction(async (manager) => {
-      // Advisory lock a nivel de transacción: serializa acceso concurrente al mismo slot
-      const lockKey = `${dto.service_id}|${slotStartUtc.toISOString()}`;
+      // Advisory lock por (service_id, slot_start, spot_number) — permite reservar cupos distintos en paralelo
+      const lockKey = `${dto.service_id}|${slotStartUtc.toISOString()}|${dto.spot_number}`;
       await manager.query(
         `SELECT pg_advisory_xact_lock(('x' || substr(md5($1), 1, 16))::bit(64)::bigint)`,
         [lockKey],
       );
 
-      const activeCount = await manager
-        .getRepository(Reservation)
-        .createQueryBuilder('r')
-        .where('r.service_id = :serviceId', { serviceId: dto.service_id })
-        .andWhere('r.slot_start = :slotStart', { slotStart: slotStartUtc })
-        .andWhere('r.status IN (:...statuses)', { statuses: ACTIVE_STATUSES })
-        .getCount();
+      // Verificar que el cupo específico no esté tomado
+      const existingSpot = await manager.getRepository(Reservation).findOne({
+        where: {
+          serviceId: dto.service_id,
+          slotStart: slotStartUtc,
+          spotNumber: dto.spot_number,
+          status: In(ACTIVE_STATUSES),
+        },
+      });
 
-      const available = slotInfo.capacity - activeCount;
-
-      if (available <= 0) {
+      if (existingSpot) {
         throw new ConflictException(
-          `Sin cupos disponibles para ${dto.slot_start}. Capacidad: ${slotInfo.capacity}, Reservadas: ${activeCount}`,
+          `El cupo ${dto.spot_number} ya está ocupado para el horario ${dto.slot_start}`,
         );
       }
 
       const memberId: string | null =
         typeof dto.metadata?.member_id === 'string' ? dto.metadata.member_id : null;
+
       const reservation = manager.getRepository(Reservation).create({
         serviceId: dto.service_id,
         slotStart: slotStartUtc,
@@ -90,6 +98,7 @@ export class ReservationsService {
         status: ReservationStatus.CONFIRMED,
         customerName: dto.customer_name ?? null,
         customerExternalId: dto.customer_external_id ?? null,
+        spotNumber: dto.spot_number,
         memberId,
         metadata: dto.metadata ?? null,
       });
@@ -100,11 +109,9 @@ export class ReservationsService {
 
   async cancel(reservationId: number): Promise<Reservation> {
     const reservation = await this.findOne(reservationId);
-
     if (reservation.status === ReservationStatus.CANCELLED) {
       throw new BadRequestException(`La reserva ${reservationId} ya está cancelada`);
     }
-
     reservation.status = ReservationStatus.CANCELLED;
     return this.reservationRepo.save(reservation);
   }
@@ -130,7 +137,6 @@ export class ReservationsService {
         .endOf('day')
         .toUTC()
         .toJSDate();
-
       qb.andWhere('r.slot_start >= :startOfDay', { startOfDay })
         .andWhere('r.slot_start <= :endOfDay', { endOfDay });
     }

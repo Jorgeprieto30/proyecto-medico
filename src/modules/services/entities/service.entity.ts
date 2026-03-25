@@ -2,11 +2,13 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  OneToMany,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { User } from '../../users/entities/user.entity';
 
 @Entity('services')
 export class Service {
@@ -18,7 +20,7 @@ export class Service {
   @Column({ length: 255 })
   name: string;
 
-  @ApiProperty({ example: 'Atención médica general para pacientes', nullable: true })
+  @ApiPropertyOptional({ example: 'Atención médica general para pacientes', nullable: true })
   @Column({ type: 'text', nullable: true })
   description: string;
 
@@ -30,9 +32,25 @@ export class Service {
   @Column({ name: 'slot_duration_minutes', default: 60 })
   slotDurationMinutes: number;
 
+  @ApiProperty({ example: 20, description: 'Cupos numerados máximos por sesión (clases con lista)' })
+  @Column({ name: 'max_spots', default: 20 })
+  maxSpots: number;
+
+  @ApiPropertyOptional({ example: 'Bici', description: 'Etiqueta opcional para cada cupo (ej: "Bici", "Silla")', nullable: true })
+  @Column({ name: 'spot_label', type: 'varchar', length: 50, nullable: true })
+  spotLabel: string | null;
+
   @ApiProperty({ example: true })
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
+
+  @ApiPropertyOptional({ nullable: true })
+  @Column({ name: 'user_id', type: 'uuid', nullable: true })
+  userId: string | null;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'user_id' })
+  user: User | null;
 
   @ApiProperty()
   @CreateDateColumn({ name: 'created_at' })

@@ -5,7 +5,10 @@ export interface Service {
   description: string | null;
   timezone: string;
   slotDurationMinutes: number;
+  maxSpots: number;
+  spotLabel: string | null;
   isActive: boolean;
+  userId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -15,6 +18,8 @@ export interface CreateServiceDto {
   description?: string;
   timezone: string;
   slotDurationMinutes: number;
+  maxSpots: number;
+  spotLabel?: string;
   isActive?: boolean;
 }
 
@@ -93,6 +98,15 @@ export interface CreateExceptionDto {
 
 export type UpdateExceptionDto = Partial<CreateExceptionDto>;
 
+// ─── Session overrides ────────────────────────────────────────────────────────
+export interface SessionSpotOverride {
+  id: string;
+  serviceId: string;
+  slotStart: string;
+  maxSpots: number;
+  createdAt: string;
+}
+
 // ─── Disponibilidad ──────────────────────────────────────────────────────────
 export interface SlotAvailability {
   slot_start: string;
@@ -107,6 +121,20 @@ export interface SlotDetail extends SlotAvailability {
   exists: boolean;
 }
 
+export interface SpotInfo {
+  number: number;
+  available: boolean;
+}
+
+export interface SlotSpots {
+  service_id: string;
+  slot_start: string;
+  slot_end: string;
+  max_spots: number;
+  spot_label: string | null;
+  spots: SpotInfo[];
+}
+
 // ─── Reservas ────────────────────────────────────────────────────────────────
 export type ReservationStatus = 'confirmed' | 'pending' | 'cancelled';
 
@@ -118,6 +146,7 @@ export interface Reservation {
   status: ReservationStatus;
   customerName: string | null;
   customerExternalId: string | null;
+  spotNumber: number | null;
   metadata: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
@@ -126,6 +155,7 @@ export interface Reservation {
 export interface CreateReservationDto {
   service_id: string;
   slot_start: string;
+  spot_number: number;
   customer_name?: string;
   customer_external_id?: string;
   metadata?: Record<string, unknown>;

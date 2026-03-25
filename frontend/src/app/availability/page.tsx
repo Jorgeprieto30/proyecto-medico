@@ -25,6 +25,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const reserveSchema = z.object({
+  spot_number: z.coerce.number().min(1, 'Selecciona un cupo'),
   customer_name: z.string().optional(),
   customer_external_id: z.string().optional(),
 });
@@ -259,6 +260,17 @@ function AvailabilityContent() {
         })() : ''}
       >
         <form onSubmit={handleSubmit((d) => reserveMutation.mutate(d))} className="space-y-4">
+          <div>
+            <Label>Número de cupo *</Label>
+            <Input
+              type="number"
+              min={1}
+              max={bookingSlot?.capacity}
+              {...register('spot_number')}
+              className="mt-1"
+              placeholder={`1 – ${bookingSlot?.capacity ?? '?'}`}
+            />
+          </div>
           <div>
             <Label>Nombre del cliente (opcional)</Label>
             <Input {...register('customer_name')} className="mt-1" placeholder="Nombre completo" />

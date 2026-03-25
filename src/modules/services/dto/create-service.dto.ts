@@ -10,12 +10,12 @@ import {
 } from 'class-validator';
 
 export class CreateServiceDto {
-  @ApiProperty({ example: 'Consulta Médica General' })
+  @ApiProperty({ example: 'Spinning' })
   @IsString()
   @IsNotEmpty()
   name: string;
 
-  @ApiPropertyOptional({ example: 'Atención médica general para pacientes' })
+  @ApiPropertyOptional({ example: 'Clase de spinning con bicicletas numeradas' })
   @IsString()
   @IsOptional()
   description?: string;
@@ -38,6 +38,25 @@ export class CreateServiceDto {
   @Min(5)
   @Max(480)
   slotDurationMinutes: number;
+
+  @ApiProperty({
+    example: 20,
+    description: 'Cupos máximos por sesión (1–500). Cambiarlo borra todos los overrides por sesión.',
+    minimum: 1,
+    maximum: 500,
+  })
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  maxSpots: number;
+
+  @ApiPropertyOptional({
+    example: 'Bici',
+    description: 'Etiqueta para cada cupo (ej: "Bici" → "Bici 1", "Bici 2"…). Opcional.',
+  })
+  @IsString()
+  @IsOptional()
+  spotLabel?: string;
 
   @ApiPropertyOptional({ example: true, default: true })
   @IsBoolean()

@@ -35,6 +35,8 @@ const generalSchema = z.object({
   description:         z.string().optional(),
   timezone:            z.string().min(1),
   slotDurationMinutes: z.coerce.number().min(5).max(480),
+  maxSpots:            z.coerce.number().min(1, 'Mínimo 1').max(500, 'Máximo 500'),
+  spotLabel:           z.string().optional(),
 });
 type GeneralForm = z.infer<typeof generalSchema>;
 
@@ -94,6 +96,8 @@ export function UnifiedEditModal({
                 description: service.description ?? '',
                 timezone: service.timezone,
                 slotDurationMinutes: service.slotDurationMinutes,
+                maxSpots: service.maxSpots,
+                spotLabel: service.spotLabel ?? '',
               } : undefined}
             />
           )}
@@ -166,6 +170,18 @@ function GeneralTab({
           {errors.slotDurationMinutes && (
             <p className="text-xs text-red-500 mt-1">{errors.slotDurationMinutes.message}</p>
           )}
+        </div>
+
+        <div>
+          <Label>Cupos máximos por sesión *</Label>
+          <Input type="number" min={1} max={500} {...register('maxSpots')} className="mt-1" placeholder="20" />
+          <p className="text-xs text-gray-400 mt-0.5">Cambiarlo borra todos los overrides por sesión</p>
+          {errors.maxSpots && <p className="text-xs text-red-500 mt-1">{errors.maxSpots.message}</p>}
+        </div>
+
+        <div className="col-span-2">
+          <Label>Etiqueta de cupo (opcional)</Label>
+          <Input {...register('spotLabel')} className="mt-1" placeholder='ej: "Bici" → "Bici 1", "Bici 2"…' />
         </div>
       </div>
 

@@ -3,9 +3,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Service } from './entities/service.entity';
 import { ServicesService } from './services.service';
 import { ServicesController } from './services.controller';
+import { SessionSpotOverridesModule } from '../session-spot-overrides/session-spot-overrides.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Service])],
+  imports: [
+    TypeOrmModule.forFeature([Service]),
+    SessionSpotOverridesModule,
+  ],
   controllers: [ServicesController],
   providers: [ServicesService],
   exports: [ServicesService],
