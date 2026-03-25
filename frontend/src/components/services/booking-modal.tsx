@@ -231,14 +231,16 @@ export function BookingModal({
               const isSelected = dateStr === selectedDate;
               const info = monthData?.[dateStr];
               const hasDot = !!info;
+              const noSlots = !!monthData && !info; // loaded but no slots
+              const disabled = isPast || noSlots;
 
               return (
                 <button
                   key={dateStr}
                   onClick={() => selectDate(dateStr)}
-                  disabled={isPast}
+                  disabled={disabled}
                   className={`flex flex-col items-center py-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed
-                    ${isSelected ? 'bg-blue-600 text-white' : isToday ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-gray-100 text-gray-700'}
+                    ${isSelected ? 'bg-blue-600 text-white' : isToday ? 'bg-blue-50 text-blue-700 font-semibold' : !disabled ? 'hover:bg-gray-100 text-gray-700' : 'text-gray-700'}
                   `}
                 >
                   <span className="text-sm leading-none">{dayNum}</span>
