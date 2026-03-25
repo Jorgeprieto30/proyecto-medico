@@ -41,8 +41,13 @@ export default function MisReservasPage() {
     fetch(`${BASE}/members/reservations`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((r) => r.json())
-      .then((json) => {
+      .then(async (r) => {
+        if (r.status === 401) {
+          router.replace('/portal/login?redirect=/portal/mis-reservas');
+          return;
+        }
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.message || 'Error');
         setReservations(json.data ?? json);
         setLoading(false);
       })
