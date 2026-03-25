@@ -116,6 +116,18 @@ export class ReservationsService {
     return this.reservationRepo.save(reservation);
   }
 
+  async cancelByMember(reservationId: number, memberId: string): Promise<Reservation> {
+    const reservation = await this.findOne(reservationId);
+    if (reservation.memberId !== memberId) {
+      throw new NotFoundException(`Reserva con id ${reservationId} no encontrada`);
+    }
+    if (reservation.status === ReservationStatus.CANCELLED) {
+      throw new BadRequestException(`La reserva ${reservationId} ya está cancelada`);
+    }
+    reservation.status = ReservationStatus.CANCELLED;
+    return this.reservationRepo.save(reservation);
+  }
+
   async findAll(query: ListReservationsQuery): Promise<Reservation[]> {
     const qb = this.reservationRepo
       .createQueryBuilder('r')

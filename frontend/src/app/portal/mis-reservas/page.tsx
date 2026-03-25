@@ -30,6 +30,8 @@ export default function MisReservasPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [confirmCancelId, setConfirmCancelId] = useState<number | null>(null);
 
   useEffect(() => {
     const token = getMemberToken();
@@ -56,6 +58,28 @@ export default function MisReservasPage() {
         setLoading(false);
       });
   }, [router]);
+
+  const handleCancel = async (id: number) => {
+    const token = getMemberToken();
+    if (!token) return;
+    setCancellingId(id);
+    try {
+      const res = await fetch(`${BASE}/members/reservations/${id}/cancel`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || 'Error al cancelar');
+      setReservations((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, status: 'cancelled' } : r)),
+      );
+    } catch (e: any) {
+      setError(e.message || 'Error al cancelar la reserva.');
+    } finally {
+      setCancellingId(null);
+      setConfirmCancelId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -95,6 +119,10 @@ export default function MisReservasPage() {
       <div className="space-y-3">
         {reservations.map((r) => {
           const tz = r.service?.timezone ?? 'UTC';
+          const isActive = r.status === 'confirmed' || r.status === 'pending';
+          const isConfirming = confirmCancelId === r.id;
+          const isCancelling = cancellingId === r.id;
+
           return (
             <div
               key={r.id}
@@ -115,11 +143,40 @@ export default function MisReservasPage() {
                     <p className="text-xs text-gray-400 mt-1">{r.customerName}</p>
                   )}
                 </div>
-                <span
-                  className={`flex-shrink-0 text-xs font-medium px-2.5 py-1 rounded-full ${getStatusColor(r.status)}`}
-                >
-                  {getStatusLabel(r.status)}
-                </span>
+                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                  <span
+                    className={`text-xs font-medium px-2.5 py-1 rounded-full ${getStatusColor(r.status)}`}
+                  >
+                    {getStatusLabel(r.status)}
+                  </span>
+                  {isActive && (
+                    isConfirming ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500">¿Cancelar?</span>
+                        <button
+                          onClick={() => handleCancel(r.id)}
+                          disabled={isCancelling}
+                          className="text-xs text-white bg-red-500 hover:bg-red-600 px-2.5 py-1 rounded-lg disabled:opacity-50"
+                        >
+                          {isCancelling ? 'Cancelando...' : 'Sí, cancelar'}
+                        </button>
+                        <button
+                          onClick={() => setConfirmCancelId(null)}
+                          className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded-lg border border-gray-200"
+                        >
+                          No
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setConfirmCancelId(r.id)}
+                        className="text-xs text-red-500 hover:text-red-700 hover:underline"
+                      >
+                        Cancelar reserva
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
             </div>
           );

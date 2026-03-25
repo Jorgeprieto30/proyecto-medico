@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   HttpCode,
+  Param,
+  ParseIntPipe,
   Post,
   Patch,
   UseGuards,
@@ -117,5 +119,17 @@ export class MembersController {
   @ApiOperation({ summary: 'Listar reservas del miembro autenticado' })
   getReservations(@Member() member: MemberEntity) {
     return this.reservationsService.findByMemberId(member.id);
+  }
+
+  @Public()
+  @UseGuards(MemberJwtGuard)
+  @Patch('reservations/:id/cancel')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cancelar una reserva propia del miembro' })
+  cancelReservation(
+    @Member() member: MemberEntity,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.reservationsService.cancelByMember(id, member.id);
   }
 }
