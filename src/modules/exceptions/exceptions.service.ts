@@ -17,8 +17,8 @@ export class ExceptionsService {
     private readonly servicesService: ServicesService,
   ) {}
 
-  async create(serviceId: string, dto: CreateExceptionDto): Promise<ServiceException> {
-    await this.servicesService.findOne(serviceId);
+  async create(serviceId: string, userId: string, dto: CreateExceptionDto): Promise<ServiceException> {
+    await this.servicesService.findOneForUser(serviceId, userId);
 
     const exception = this.exceptionRepo.create({
       serviceId,
@@ -32,8 +32,8 @@ export class ExceptionsService {
     return this.exceptionRepo.save(exception);
   }
 
-  async findAllByService(serviceId: string): Promise<ServiceException[]> {
-    await this.servicesService.findOne(serviceId);
+  async findAllByService(serviceId: string, userId: string): Promise<ServiceException[]> {
+    await this.servicesService.findOneForUser(serviceId, userId);
     return this.exceptionRepo.find({
       where: { serviceId },
       order: { exceptionDate: 'ASC', startTime: 'ASC' },
@@ -48,8 +48,9 @@ export class ExceptionsService {
     return ex;
   }
 
-  async update(exceptionId: number, dto: UpdateExceptionDto): Promise<ServiceException> {
+  async update(exceptionId: number, userId: string, dto: UpdateExceptionDto): Promise<ServiceException> {
     const ex = await this.findOne(exceptionId);
+    await this.servicesService.findOneForUser(ex.serviceId, userId);
     Object.assign(ex, {
       ...dto,
       startTime: dto.startTime !== undefined ? (dto.startTime ?? null) : ex.startTime,
@@ -61,8 +62,9 @@ export class ExceptionsService {
     return this.exceptionRepo.save(ex);
   }
 
-  async remove(exceptionId: number): Promise<void> {
+  async remove(exceptionId: number, userId: string): Promise<void> {
     const ex = await this.findOne(exceptionId);
+    await this.servicesService.findOneForUser(ex.serviceId, userId);
     await this.exceptionRepo.remove(ex);
   }
 

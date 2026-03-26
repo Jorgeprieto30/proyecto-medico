@@ -7,17 +7,23 @@ import {
   Patch,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ReservationsService } from './reservations.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { ListReservationsQuery } from './dto/list-reservations.dto';
 import { Reservation, ReservationStatus } from './entities/reservation.entity';
+import { ServicesService } from '../services/services.service';
 
 @ApiTags('reservations')
+@ApiBearerAuth()
 @Controller('reservations')
 export class ReservationsController {
-  constructor(private readonly reservationsService: ReservationsService) {}
+  constructor(
+    private readonly reservationsService: ReservationsService,
+    private readonly servicesService: ServicesService,
+  ) {}
 
   @Post()
   @ApiOperation({
@@ -29,17 +35,21 @@ export class ReservationsController {
   @ApiResponse({ status: 400, description: 'Datos inválidos o slot inexistente' })
   @ApiResponse({ status: 404, description: 'Servicio no encontrado' })
   @ApiResponse({ status: 409, description: 'Sin cupos disponibles' })
-  create(@Body() dto: CreateReservationDto): Promise<Reservation> {
+  async create(@Body() dto: CreateReservationDto, @Req() req: any): Promise<Reservation> {
+    await this.servicesService.findOneForUser(dto.service_id, req.user.sub);
     return this.reservationsService.create(dto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Listar reservas de un servicio' })
-  @ApiQuery({ name: 'service_id', type: Number })
+  @ApiQuery({ name: 'service_id', type: String })
   @ApiQuery({ name: 'date', type: String, required: false, example: '2026-03-20' })
   @ApiQuery({ name: 'status', enum: ReservationStatus, required: false })
   @ApiResponse({ status: 200, type: [Reservation] })
-  findAll(@Query() query: ListReservationsQuery): Promise<Reservation[]> {
+  async findAll(@Query() query: ListReservationsQuery, @Req() req: any): Promise<Reservation[]> {
+    if (query.service_id) {
+      await this.servicesService.findOneForUser(query.service_id, req.user.sub);
+    }
     return this.reservationsService.findAll(query);
   }
 
@@ -48,8 +58,10 @@ export class ReservationsController {
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({ status: 200, type: Reservation })
   @ApiResponse({ status: 404, description: 'Reserva no encontrada' })
-  findOne(@Param('id', ParseIntPipe) id: number): Promise<Reservation> {
-    return this.reservationsService.findOne(id);
+  async findOne(@Param('id', ParseIntPipe) id: number, @Req() req: any): Promise<Reservation> {
+    const reservation = await this.reservationsService.findOne(id);
+    await this.servicesService.findOneForUser(reservation.serviceId, req.user.sub);
+    return reservation;
   }
 
   @Patch(':id/cancel')
@@ -58,7 +70,9 @@ export class ReservationsController {
   @ApiResponse({ status: 200, type: Reservation })
   @ApiResponse({ status: 400, description: 'La reserva ya está cancelada' })
   @ApiResponse({ status: 404, description: 'Reserva no encontrada' })
-  cancel(@Param('id', ParseIntPipe) id: number): Promise<Reservation> {
+  async cancel(@Param('id', ParseIntPipe) id: number, @Req() req: any): Promise<Reservation> {
+    const reservation = await this.reservationsService.findOne(id);
+    await this.servicesService.findOneForUser(reservation.serviceId, req.user.sub);
     return this.reservationsService.cancel(id);
   }
 }

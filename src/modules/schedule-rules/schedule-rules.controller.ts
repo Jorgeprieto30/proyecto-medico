@@ -7,8 +7,10 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Req,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiBody,
   ApiOperation,
   ApiParam,
@@ -21,6 +23,7 @@ import { UpdateScheduleRuleDto } from './dto/update-schedule-rule.dto';
 import { ScheduleRule } from './entities/schedule-rule.entity';
 
 @ApiTags('schedule-rules')
+@ApiBearerAuth()
 @Controller()
 export class ScheduleRulesController {
   constructor(private readonly rulesService: ScheduleRulesService) {}
@@ -35,8 +38,9 @@ export class ScheduleRulesController {
   create(
     @Param('serviceId') serviceId: string,
     @Body() dto: CreateScheduleRuleDto,
+    @Req() req: any,
   ): Promise<ScheduleRule> {
-    return this.rulesService.create(serviceId, dto);
+    return this.rulesService.create(serviceId, req.user.sub, dto);
   }
 
   @Get('services/:serviceId/schedule-rules')
@@ -46,8 +50,9 @@ export class ScheduleRulesController {
   @ApiResponse({ status: 404, description: 'Servicio no encontrado' })
   findAll(
     @Param('serviceId') serviceId: string,
+    @Req() req: any,
   ): Promise<ScheduleRule[]> {
-    return this.rulesService.findAllByService(serviceId);
+    return this.rulesService.findAllByService(serviceId, req.user.sub);
   }
 
   @Patch('schedule-rules/:ruleId')
@@ -59,8 +64,9 @@ export class ScheduleRulesController {
   update(
     @Param('ruleId', ParseIntPipe) ruleId: number,
     @Body() dto: UpdateScheduleRuleDto,
+    @Req() req: any,
   ): Promise<ScheduleRule> {
-    return this.rulesService.update(ruleId, dto);
+    return this.rulesService.update(ruleId, req.user.sub, dto);
   }
 
   @Delete('schedule-rules/:ruleId')
@@ -68,7 +74,10 @@ export class ScheduleRulesController {
   @ApiParam({ name: 'ruleId', type: Number })
   @ApiResponse({ status: 200, description: 'Regla desactivada' })
   @ApiResponse({ status: 404, description: 'Regla no encontrada' })
-  remove(@Param('ruleId', ParseIntPipe) ruleId: number): Promise<void> {
-    return this.rulesService.remove(ruleId);
+  remove(
+    @Param('ruleId', ParseIntPipe) ruleId: number,
+    @Req() req: any,
+  ): Promise<void> {
+    return this.rulesService.remove(ruleId, req.user.sub);
   }
 }

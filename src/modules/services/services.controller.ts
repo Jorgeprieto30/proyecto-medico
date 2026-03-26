@@ -55,8 +55,8 @@ export class ServicesController {
   @ApiParam({ name: 'id', type: String })
   @ApiResponse({ status: 200, type: Service })
   @ApiResponse({ status: 404, description: 'Servicio no encontrado' })
-  findOne(@Param('id') id: string): Promise<Service> {
-    return this.servicesService.findOne(id);
+  findOne(@Param('id') id: string, @Req() req: any): Promise<Service> {
+    return this.servicesService.findOneForUser(id, req.user.sub);
   }
 
   @Patch(':id')

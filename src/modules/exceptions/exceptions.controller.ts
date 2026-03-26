@@ -8,8 +8,10 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Req,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiBody,
   ApiOperation,
   ApiParam,
@@ -22,6 +24,7 @@ import { UpdateExceptionDto } from './dto/update-exception.dto';
 import { ServiceException } from './entities/service-exception.entity';
 
 @ApiTags('exceptions')
+@ApiBearerAuth()
 @Controller()
 export class ExceptionsController {
   constructor(private readonly exceptionsService: ExceptionsService) {}
@@ -36,8 +39,9 @@ export class ExceptionsController {
   create(
     @Param('serviceId') serviceId: string,
     @Body() dto: CreateExceptionDto,
+    @Req() req: any,
   ): Promise<ServiceException> {
-    return this.exceptionsService.create(serviceId, dto);
+    return this.exceptionsService.create(serviceId, req.user.sub, dto);
   }
 
   @Get('services/:serviceId/exceptions')
@@ -46,8 +50,9 @@ export class ExceptionsController {
   @ApiResponse({ status: 200, type: [ServiceException] })
   findAll(
     @Param('serviceId') serviceId: string,
+    @Req() req: any,
   ): Promise<ServiceException[]> {
-    return this.exceptionsService.findAllByService(serviceId);
+    return this.exceptionsService.findAllByService(serviceId, req.user.sub);
   }
 
   @Patch('exceptions/:exceptionId')
@@ -59,8 +64,9 @@ export class ExceptionsController {
   update(
     @Param('exceptionId', ParseIntPipe) exceptionId: number,
     @Body() dto: UpdateExceptionDto,
+    @Req() req: any,
   ): Promise<ServiceException> {
-    return this.exceptionsService.update(exceptionId, dto);
+    return this.exceptionsService.update(exceptionId, req.user.sub, dto);
   }
 
   @Delete('exceptions/:exceptionId')
@@ -69,7 +75,10 @@ export class ExceptionsController {
   @ApiParam({ name: 'exceptionId', type: Number })
   @ApiResponse({ status: 204, description: 'Excepción eliminada' })
   @ApiResponse({ status: 404, description: 'Excepción no encontrada' })
-  remove(@Param('exceptionId', ParseIntPipe) exceptionId: number): Promise<void> {
-    return this.exceptionsService.remove(exceptionId);
+  remove(
+    @Param('exceptionId', ParseIntPipe) exceptionId: number,
+    @Req() req: any,
+  ): Promise<void> {
+    return this.exceptionsService.remove(exceptionId, req.user.sub);
   }
 }

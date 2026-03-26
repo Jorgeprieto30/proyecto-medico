@@ -7,8 +7,10 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Req,
 } from '@nestjs/common';
 import {
+  ApiBearerAuth,
   ApiBody,
   ApiOperation,
   ApiParam,
@@ -21,6 +23,7 @@ import { UpdateScheduleBlockDto } from './dto/update-schedule-block.dto';
 import { ScheduleBlock } from './entities/schedule-block.entity';
 
 @ApiTags('schedule-blocks')
+@ApiBearerAuth()
 @Controller()
 export class ScheduleBlocksController {
   constructor(private readonly blocksService: ScheduleBlocksService) {}
@@ -35,8 +38,9 @@ export class ScheduleBlocksController {
   create(
     @Param('serviceId') serviceId: string,
     @Body() dto: CreateScheduleBlockDto,
+    @Req() req: any,
   ): Promise<ScheduleBlock> {
-    return this.blocksService.create(serviceId, dto);
+    return this.blocksService.create(serviceId, req.user.sub, dto);
   }
 
   @Get('services/:serviceId/schedule-blocks')
@@ -45,8 +49,9 @@ export class ScheduleBlocksController {
   @ApiResponse({ status: 200, type: [ScheduleBlock] })
   findAll(
     @Param('serviceId') serviceId: string,
+    @Req() req: any,
   ): Promise<ScheduleBlock[]> {
-    return this.blocksService.findAllByService(serviceId);
+    return this.blocksService.findAllByService(serviceId, req.user.sub);
   }
 
   @Patch('schedule-blocks/:blockId')
@@ -58,8 +63,9 @@ export class ScheduleBlocksController {
   update(
     @Param('blockId', ParseIntPipe) blockId: number,
     @Body() dto: UpdateScheduleBlockDto,
+    @Req() req: any,
   ): Promise<ScheduleBlock> {
-    return this.blocksService.update(blockId, dto);
+    return this.blocksService.update(blockId, req.user.sub, dto);
   }
 
   @Delete('schedule-blocks/:blockId')
@@ -67,7 +73,10 @@ export class ScheduleBlocksController {
   @ApiParam({ name: 'blockId', type: Number })
   @ApiResponse({ status: 200, description: 'Tramo desactivado' })
   @ApiResponse({ status: 404, description: 'Bloque no encontrado' })
-  remove(@Param('blockId', ParseIntPipe) blockId: number): Promise<void> {
-    return this.blocksService.remove(blockId);
+  remove(
+    @Param('blockId', ParseIntPipe) blockId: number,
+    @Req() req: any,
+  ): Promise<void> {
+    return this.blocksService.remove(blockId, req.user.sub);
   }
 }

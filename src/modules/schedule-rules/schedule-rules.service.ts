@@ -18,11 +18,9 @@ export class ScheduleRulesService {
     private readonly servicesService: ServicesService,
   ) {}
 
-  async create(serviceId: string, dto: CreateScheduleRuleDto): Promise<ScheduleRule> {
-    // Verificar que el servicio exista
-    await this.servicesService.findOne(serviceId);
+  async create(serviceId: string, userId: string, dto: CreateScheduleRuleDto): Promise<ScheduleRule> {
+    await this.servicesService.findOneForUser(serviceId, userId);
 
-    // Validar que startTime < endTime
     if (dto.startTime >= dto.endTime) {
       throw new BadRequestException('startTime debe ser anterior a endTime');
     }
@@ -35,8 +33,8 @@ export class ScheduleRulesService {
     return this.ruleRepo.save(rule);
   }
 
-  async findAllByService(serviceId: string): Promise<ScheduleRule[]> {
-    await this.servicesService.findOne(serviceId);
+  async findAllByService(serviceId: string, userId: string): Promise<ScheduleRule[]> {
+    await this.servicesService.findOneForUser(serviceId, userId);
     return this.ruleRepo.find({
       where: { serviceId },
       order: { dayOfWeek: 'ASC', startTime: 'ASC' },
@@ -51,8 +49,9 @@ export class ScheduleRulesService {
     return rule;
   }
 
-  async update(ruleId: number, dto: UpdateScheduleRuleDto): Promise<ScheduleRule> {
+  async update(ruleId: number, userId: string, dto: UpdateScheduleRuleDto): Promise<ScheduleRule> {
     const rule = await this.findOne(ruleId);
+    await this.servicesService.findOneForUser(rule.serviceId, userId);
 
     const newStartTime = dto.startTime ?? rule.startTime;
     const newEndTime = dto.endTime ?? rule.endTime;
@@ -65,9 +64,9 @@ export class ScheduleRulesService {
     return this.ruleRepo.save(rule);
   }
 
-  async remove(ruleId: number): Promise<void> {
+  async remove(ruleId: number, userId: string): Promise<void> {
     const rule = await this.findOne(ruleId);
-    // Desactivar en lugar de borrar para no perder historial
+    await this.servicesService.findOneForUser(rule.serviceId, userId);
     rule.isActive = false;
     await this.ruleRepo.save(rule);
   }

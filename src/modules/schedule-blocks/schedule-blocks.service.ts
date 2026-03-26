@@ -18,8 +18,8 @@ export class ScheduleBlocksService {
     private readonly servicesService: ServicesService,
   ) {}
 
-  async create(serviceId: string, dto: CreateScheduleBlockDto): Promise<ScheduleBlock> {
-    await this.servicesService.findOne(serviceId);
+  async create(serviceId: string, userId: string, dto: CreateScheduleBlockDto): Promise<ScheduleBlock> {
+    await this.servicesService.findOneForUser(serviceId, userId);
 
     if (dto.startTime >= dto.endTime) {
       throw new BadRequestException('startTime debe ser anterior a endTime');
@@ -33,8 +33,8 @@ export class ScheduleBlocksService {
     return this.blockRepo.save(block);
   }
 
-  async findAllByService(serviceId: string): Promise<ScheduleBlock[]> {
-    await this.servicesService.findOne(serviceId);
+  async findAllByService(serviceId: string, userId: string): Promise<ScheduleBlock[]> {
+    await this.servicesService.findOneForUser(serviceId, userId);
     return this.blockRepo.find({
       where: { serviceId },
       order: { dayOfWeek: 'ASC', startTime: 'ASC' },
@@ -49,8 +49,9 @@ export class ScheduleBlocksService {
     return block;
   }
 
-  async update(blockId: number, dto: UpdateScheduleBlockDto): Promise<ScheduleBlock> {
+  async update(blockId: number, userId: string, dto: UpdateScheduleBlockDto): Promise<ScheduleBlock> {
     const block = await this.findOne(blockId);
+    await this.servicesService.findOneForUser(block.serviceId, userId);
 
     const newStartTime = dto.startTime ?? block.startTime;
     const newEndTime = dto.endTime ?? block.endTime;
@@ -63,8 +64,9 @@ export class ScheduleBlocksService {
     return this.blockRepo.save(block);
   }
 
-  async remove(blockId: number): Promise<void> {
+  async remove(blockId: number, userId: string): Promise<void> {
     const block = await this.findOne(blockId);
+    await this.servicesService.findOneForUser(block.serviceId, userId);
     block.isActive = false;
     await this.blockRepo.save(block);
   }
