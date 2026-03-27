@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getMemberToken, getMemberProfile, updateMemberProfile, memberLogout } from '@/lib/member-auth';
-import { validateRut } from '@/lib/utils';
+import { validateRut, normalizeRut } from '@/lib/utils';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
@@ -78,7 +78,7 @@ export default function PerfilPage() {
         body: JSON.stringify({
           first_name: firstName.trim(),
           last_name: lastName.trim(),
-          rut: rut.trim() || undefined,
+          rut: rut.trim() ? normalizeRut(rut.trim()) : undefined,
           birth_date: birthDate || undefined,
         }),
       });

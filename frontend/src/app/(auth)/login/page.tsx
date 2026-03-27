@@ -119,11 +119,6 @@ function AdminLoginForm({ callbackUrl }: { callbackUrl: string }) {
         {loading ? 'Ingresando...' : 'Ingresar'}
       </button>
 
-      <p className="text-center text-sm text-gray-400 pt-1">
-        <Link href="/forgot-password" className="text-blue-500 hover:underline">
-          ¿Olvidaste tu contraseña?
-        </Link>
-      </p>
       <p className="text-center text-sm text-gray-400">
         ¿No tienes cuenta?{' '}
         <Link href="/register" className="font-medium text-blue-500 hover:underline">
@@ -214,11 +209,6 @@ function MemberLoginForm({ redirect }: { redirect: string }) {
         {loading ? 'Ingresando...' : 'Ingresar'}
       </button>
 
-      <p className="text-center text-sm text-gray-400 pt-1">
-        <Link href="/portal/forgot-password" className="text-blue-500 hover:underline">
-          ¿Olvidaste tu contraseña?
-        </Link>
-      </p>
       <p className="text-center text-sm text-gray-400">
         ¿No tienes cuenta?{' '}
         <Link href="/portal/register" className="font-medium text-blue-500 hover:underline">

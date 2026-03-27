@@ -4,7 +4,7 @@ import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { memberLogin } from '@/lib/member-auth';
-import { validateRut } from '@/lib/utils';
+import { validateRut, normalizeRut } from '@/lib/utils';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
@@ -34,7 +34,8 @@ function RegisterForm() {
     if (!form.first_name.trim()) errs.first_name = 'Nombre requerido';
     if (!form.last_name.trim()) errs.last_name = 'Apellido requerido';
     if (!form.email.includes('@')) errs.email = 'Email inválido';
-    if (form.rut && !validateRut(form.rut)) errs.rut = 'RUT inválido (ej: 12.345.678-9)';
+    if (!form.rut.trim()) errs.rut = 'RUT requerido';
+    else if (!validateRut(form.rut)) errs.rut = 'RUT inválido (ej: 12345678-9)';
     if (!form.birth_date) errs.birth_date = 'Fecha de nacimiento requerida';
     if (form.password.length < 8) errs.password = 'Mínimo 8 caracteres';
     if (form.password !== form.confirmPassword) errs.confirmPassword = 'Las contraseñas no coinciden';
@@ -59,8 +60,8 @@ function RegisterForm() {
         email: form.email.trim(),
         password: form.password,
         birth_date: form.birth_date,
+        rut: normalizeRut(form.rut.trim()),
       };
-      if (form.rut.trim()) body.rut = form.rut.trim();
 
       const res = await fetch(`${BASE}/members/register`, {
         method: 'POST',
@@ -119,7 +120,7 @@ function RegisterForm() {
           {field('first_name', 'Nombre', 'text', 'María')}
           {field('last_name', 'Apellido', 'text', 'González')}
           {field('email', 'Correo electrónico', 'email', 'maria@example.com')}
-          {field('rut', 'RUT', 'text', '12.345.678-9', false)}
+          {field('rut', 'RUT', 'text', '12345678-9', true)}
           {field('birth_date', 'Fecha de nacimiento', 'date', '')}
           {field('password', 'Contraseña', 'password', '••••••••')}
 

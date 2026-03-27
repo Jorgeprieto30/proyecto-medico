@@ -1,9 +1,8 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import {
   IsDateString,
   IsEmail,
   IsNotEmpty,
-  IsOptional,
   IsString,
   MaxLength,
   MinLength,
@@ -27,11 +26,11 @@ export class RegisterMemberDto {
   @MaxLength(254)
   email: string;
 
-  @ApiPropertyOptional({ example: '12345678-9' })
-  @IsOptional()
+  @ApiProperty({ example: '12345678-9' })
   @IsString()
+  @IsNotEmpty()
   @MaxLength(20)
-  rut?: string;
+  rut: string;
 
   @ApiProperty({ example: '1990-05-20' })
   @IsNotEmpty()

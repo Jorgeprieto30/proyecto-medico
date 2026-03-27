@@ -16,6 +16,14 @@ import { RegisterMemberDto } from './dto/register-member.dto';
 import { LoginMemberDto } from './dto/login-member.dto';
 import { UpdateMemberDto, ChangePasswordDto } from './dto/update-member.dto';
 
+function normalizeRut(rut: string): string {
+  const clean = rut.replace(/\./g, '').replace(/\s/g, '').toUpperCase();
+  if (!clean.includes('-') && clean.length > 1) {
+    return clean.slice(0, -1) + '-' + clean.slice(-1);
+  }
+  return clean;
+}
+
 @Injectable()
 export class MembersService {
   constructor(
@@ -34,7 +42,7 @@ export class MembersService {
       first_name: dto.first_name,
       last_name: dto.last_name,
       email: dto.email,
-      rut: dto.rut ?? null,
+      rut: dto.rut ? normalizeRut(dto.rut) : null,
       birth_date: dto.birth_date ?? null,
       password_hash,
     });
@@ -71,7 +79,7 @@ export class MembersService {
     const member = await this.getProfile(id);
     if (dto.first_name !== undefined) member.first_name = dto.first_name;
     if (dto.last_name !== undefined) member.last_name = dto.last_name;
-    if (dto.rut !== undefined) member.rut = dto.rut;
+    if (dto.rut !== undefined) member.rut = dto.rut ? normalizeRut(dto.rut) : null;
     if (dto.birth_date !== undefined) member.birth_date = dto.birth_date;
     return this.memberRepo.save(member);
   }

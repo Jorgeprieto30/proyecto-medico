@@ -100,6 +100,15 @@ export function todayAsString(): string {
   return new Date().toISOString().split('T')[0];
 }
 
+/** Normaliza RUT chileno: quita puntos, asegura guión antes del dígito verificador */
+export function normalizeRut(rut: string): string {
+  const clean = rut.replace(/\./g, '').replace(/\s/g, '').toUpperCase();
+  if (!clean.includes('-') && clean.length > 1) {
+    return clean.slice(0, -1) + '-' + clean.slice(-1);
+  }
+  return clean;
+}
+
 /** Valida RUT chileno (acepta formatos: 12345678-9, 12.345.678-9, 123456789) */
 export function validateRut(rut: string): boolean {
   const clean = rut.replace(/[.\-\s]/g, '').toUpperCase();
