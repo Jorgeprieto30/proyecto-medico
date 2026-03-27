@@ -40,14 +40,14 @@ export class ServicesController {
   @ApiBody({ type: CreateServiceDto })
   @ApiResponse({ status: 201, type: Service })
   create(@Body() dto: CreateServiceDto, @Req() req: any): Promise<Service> {
-    return this.servicesService.create(dto, req.user.sub);
+    return this.servicesService.create(dto, req.user.id);
   }
 
   @Get()
   @ApiOperation({ summary: 'Listar servicios del admin autenticado' })
   @ApiResponse({ status: 200, type: [Service] })
   findAll(@Req() req: any): Promise<Service[]> {
-    return this.servicesService.findAll(req.user.sub);
+    return this.servicesService.findAll(req.user.id);
   }
 
   @Get(':id')
@@ -56,7 +56,7 @@ export class ServicesController {
   @ApiResponse({ status: 200, type: Service })
   @ApiResponse({ status: 404, description: 'Servicio no encontrado' })
   findOne(@Param('id') id: string, @Req() req: any): Promise<Service> {
-    return this.servicesService.findOneForUser(id, req.user.sub);
+    return this.servicesService.findOneForUser(id, req.user.id);
   }
 
   @Patch(':id')
@@ -69,7 +69,7 @@ export class ServicesController {
     @Body() dto: UpdateServiceDto,
     @Req() req: any,
   ): Promise<Service> {
-    return this.servicesService.update(id, dto, req.user.sub);
+    return this.servicesService.update(id, dto, req.user.id);
   }
 
   @Delete(':id')
@@ -78,7 +78,7 @@ export class ServicesController {
   @ApiParam({ name: 'id', type: String })
   @ApiResponse({ status: 204, description: 'Servicio eliminado' })
   remove(@Param('id') id: string, @Req() req: any): Promise<void> {
-    return this.servicesService.remove(id, req.user.sub);
+    return this.servicesService.remove(id, req.user.id);
   }
 
   // ─── Session spot overrides ───────────────────────────────────────────────
@@ -96,7 +96,7 @@ export class ServicesController {
     @Body() dto: UpsertSessionOverrideDto,
     @Req() req: any,
   ) {
-    await this.servicesService.findOneForUser(serviceId, req.user.sub);
+    await this.servicesService.findOneForUser(serviceId, req.user.id);
     const slotStartDt = DateTime.fromISO(dto.slot_start, { setZone: true });
     const slotStartUtc = slotStartDt.toUTC().toJSDate();
     return this.sessionOverridesService.upsert(serviceId, slotStartUtc, dto.max_spots);
@@ -111,7 +111,7 @@ export class ServicesController {
     @Body() dto: Pick<UpsertSessionOverrideDto, 'slot_start'>,
     @Req() req: any,
   ) {
-    await this.servicesService.findOneForUser(serviceId, req.user.sub);
+    await this.servicesService.findOneForUser(serviceId, req.user.id);
     const slotStartUtc = DateTime.fromISO(dto.slot_start, { setZone: true }).toUTC().toJSDate();
     await this.sessionOverridesService.deleteByServiceAndSlot(serviceId, slotStartUtc);
   }

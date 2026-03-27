@@ -41,7 +41,7 @@ export class ExceptionsController {
     @Body() dto: CreateExceptionDto,
     @Req() req: any,
   ): Promise<ServiceException> {
-    return this.exceptionsService.create(serviceId, req.user.sub, dto);
+    return this.exceptionsService.create(serviceId, req.user.id, dto);
   }
 
   @Get('services/:serviceId/exceptions')
@@ -52,7 +52,7 @@ export class ExceptionsController {
     @Param('serviceId') serviceId: string,
     @Req() req: any,
   ): Promise<ServiceException[]> {
-    return this.exceptionsService.findAllByService(serviceId, req.user.sub);
+    return this.exceptionsService.findAllByService(serviceId, req.user.id);
   }
 
   @Patch('exceptions/:exceptionId')
@@ -66,7 +66,7 @@ export class ExceptionsController {
     @Body() dto: UpdateExceptionDto,
     @Req() req: any,
   ): Promise<ServiceException> {
-    return this.exceptionsService.update(exceptionId, req.user.sub, dto);
+    return this.exceptionsService.update(exceptionId, req.user.id, dto);
   }
 
   @Delete('exceptions/:exceptionId')
@@ -79,6 +79,6 @@ export class ExceptionsController {
     @Param('exceptionId', ParseIntPipe) exceptionId: number,
     @Req() req: any,
   ): Promise<void> {
-    return this.exceptionsService.remove(exceptionId, req.user.sub);
+    return this.exceptionsService.remove(exceptionId, req.user.id);
   }
 }

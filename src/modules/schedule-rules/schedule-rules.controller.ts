@@ -40,7 +40,7 @@ export class ScheduleRulesController {
     @Body() dto: CreateScheduleRuleDto,
     @Req() req: any,
   ): Promise<ScheduleRule> {
-    return this.rulesService.create(serviceId, req.user.sub, dto);
+    return this.rulesService.create(serviceId, req.user.id, dto);
   }
 
   @Get('services/:serviceId/schedule-rules')
@@ -52,7 +52,7 @@ export class ScheduleRulesController {
     @Param('serviceId') serviceId: string,
     @Req() req: any,
   ): Promise<ScheduleRule[]> {
-    return this.rulesService.findAllByService(serviceId, req.user.sub);
+    return this.rulesService.findAllByService(serviceId, req.user.id);
   }
 
   @Patch('schedule-rules/:ruleId')
@@ -66,7 +66,7 @@ export class ScheduleRulesController {
     @Body() dto: UpdateScheduleRuleDto,
     @Req() req: any,
   ): Promise<ScheduleRule> {
-    return this.rulesService.update(ruleId, req.user.sub, dto);
+    return this.rulesService.update(ruleId, req.user.id, dto);
   }
 
   @Delete('schedule-rules/:ruleId')
@@ -78,6 +78,6 @@ export class ScheduleRulesController {
     @Param('ruleId', ParseIntPipe) ruleId: number,
     @Req() req: any,
   ): Promise<void> {
-    return this.rulesService.remove(ruleId, req.user.sub);
+    return this.rulesService.remove(ruleId, req.user.id);
   }
 }

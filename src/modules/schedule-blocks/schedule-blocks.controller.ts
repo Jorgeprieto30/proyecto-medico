@@ -40,7 +40,7 @@ export class ScheduleBlocksController {
     @Body() dto: CreateScheduleBlockDto,
     @Req() req: any,
   ): Promise<ScheduleBlock> {
-    return this.blocksService.create(serviceId, req.user.sub, dto);
+    return this.blocksService.create(serviceId, req.user.id, dto);
   }
 
   @Get('services/:serviceId/schedule-blocks')
@@ -51,7 +51,7 @@ export class ScheduleBlocksController {
     @Param('serviceId') serviceId: string,
     @Req() req: any,
   ): Promise<ScheduleBlock[]> {
-    return this.blocksService.findAllByService(serviceId, req.user.sub);
+    return this.blocksService.findAllByService(serviceId, req.user.id);
   }
 
   @Patch('schedule-blocks/:blockId')
@@ -65,7 +65,7 @@ export class ScheduleBlocksController {
     @Body() dto: UpdateScheduleBlockDto,
     @Req() req: any,
   ): Promise<ScheduleBlock> {
-    return this.blocksService.update(blockId, req.user.sub, dto);
+    return this.blocksService.update(blockId, req.user.id, dto);
   }
 
   @Delete('schedule-blocks/:blockId')
@@ -77,6 +77,6 @@ export class ScheduleBlocksController {
     @Param('blockId', ParseIntPipe) blockId: number,
     @Req() req: any,
   ): Promise<void> {
-    return this.blocksService.remove(blockId, req.user.sub);
+    return this.blocksService.remove(blockId, req.user.id);
   }
 }

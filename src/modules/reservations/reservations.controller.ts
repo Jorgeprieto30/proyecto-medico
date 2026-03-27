@@ -36,7 +36,7 @@ export class ReservationsController {
   @ApiResponse({ status: 404, description: 'Servicio no encontrado' })
   @ApiResponse({ status: 409, description: 'Sin cupos disponibles' })
   async create(@Body() dto: CreateReservationDto, @Req() req: any): Promise<Reservation> {
-    await this.servicesService.findOneForUser(dto.service_id, req.user.sub);
+    await this.servicesService.findOneForUser(dto.service_id, req.user.id);
     return this.reservationsService.create(dto);
   }
 
@@ -48,7 +48,7 @@ export class ReservationsController {
   @ApiResponse({ status: 200, type: [Reservation] })
   async findAll(@Query() query: ListReservationsQuery, @Req() req: any): Promise<Reservation[]> {
     if (query.service_id) {
-      await this.servicesService.findOneForUser(query.service_id, req.user.sub);
+      await this.servicesService.findOneForUser(query.service_id, req.user.id);
     }
     return this.reservationsService.findAll(query);
   }
@@ -60,7 +60,7 @@ export class ReservationsController {
   @ApiResponse({ status: 404, description: 'Reserva no encontrada' })
   async findOne(@Param('id', ParseIntPipe) id: number, @Req() req: any): Promise<Reservation> {
     const reservation = await this.reservationsService.findOne(id);
-    await this.servicesService.findOneForUser(reservation.serviceId, req.user.sub);
+    await this.servicesService.findOneForUser(reservation.serviceId, req.user.id);
     return reservation;
   }
 
@@ -72,7 +72,7 @@ export class ReservationsController {
   @ApiResponse({ status: 404, description: 'Reserva no encontrada' })
   async cancel(@Param('id', ParseIntPipe) id: number, @Req() req: any): Promise<Reservation> {
     const reservation = await this.reservationsService.findOne(id);
-    await this.servicesService.findOneForUser(reservation.serviceId, req.user.sub);
+    await this.servicesService.findOneForUser(reservation.serviceId, req.user.id);
     return this.reservationsService.cancel(id);
   }
 }
