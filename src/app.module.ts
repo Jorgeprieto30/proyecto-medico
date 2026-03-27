@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { DatabaseModule } from './database/database.module';
 import { ServicesModule } from './modules/services/services.module';
 import { ScheduleRulesModule } from './modules/schedule-rules/schedule-rules.module';
@@ -14,6 +16,7 @@ import { SessionSpotOverridesModule } from './modules/session-spot-overrides/ses
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 10 }]),
     DatabaseModule,
     AuthModule,
     ApiKeysModule,
@@ -26,6 +29,9 @@ import { SessionSpotOverridesModule } from './modules/session-spot-overrides/ses
     ReservationsModule,
     MembersModule,
     PublicModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}

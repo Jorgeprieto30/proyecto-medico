@@ -20,13 +20,9 @@ export class ApiKey {
   @Column()
   prefix: string;
 
-  // SHA-256 del token completo
+  // SHA-256 del token completo (nunca se devuelve en queries normales)
   @Column({ select: false })
   key_hash: string;
-
-  // Clave completa (para mostrarla en el panel)
-  @Column({ nullable: true })
-  key_value: string;
 
   @Column({ default: true })
   is_active: boolean;

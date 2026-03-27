@@ -16,7 +16,7 @@ export class UsersService {
     const existing = await this.userRepo.findOne({ where: { email: dto.email } });
     if (existing) throw new ConflictException('El email ya está registrado');
 
-    const password_hash = await bcrypt.hash(dto.password, 10);
+    const password_hash = await bcrypt.hash(dto.password, 12);
     const user = this.userRepo.create({
       name: dto.name,
       email: dto.email,

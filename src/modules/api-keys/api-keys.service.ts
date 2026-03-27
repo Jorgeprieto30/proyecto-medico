@@ -21,11 +21,11 @@ export class ApiKeysService {
       name: dto.name,
       prefix,
       key_hash,
-      key_value: raw,
       user_id: userId,
     });
     await this.repo.save(entity);
 
+    // raw solo se devuelve UNA vez en la creación; nunca se almacena en texto plano
     return { ...entity, key: raw };
   }
 

@@ -1,5 +1,6 @@
 import { Controller, Post, Get, Body, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
@@ -11,6 +12,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Public()
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Post('register')
   @ApiOperation({ summary: 'Registrar nuevo usuario' })
   register(@Body() dto: CreateUserDto) {
@@ -18,6 +20,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Post('login')
   @ApiOperation({ summary: 'Iniciar sesión con email y contraseña' })
   login(@Body() dto: LoginDto) {
@@ -25,6 +28,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Post('google')
   @ApiOperation({ summary: 'Login / registro con cuenta de Google' })
   googleLogin(

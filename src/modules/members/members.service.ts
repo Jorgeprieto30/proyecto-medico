@@ -26,7 +26,7 @@ export class MembersService {
     const existing = await this.memberRepo.findOne({ where: { email: dto.email } });
     if (existing) throw new ConflictException('El email ya está registrado');
 
-    const password_hash = await bcrypt.hash(dto.password, 10);
+    const password_hash = await bcrypt.hash(dto.password, 12);
     const member = this.memberRepo.create({
       first_name: dto.first_name,
       last_name: dto.last_name,
@@ -84,7 +84,7 @@ export class MembersService {
     const valid = await bcrypt.compare(dto.current_password, member.password_hash);
     if (!valid) throw new BadRequestException('La contraseña actual es incorrecta');
 
-    member.password_hash = await bcrypt.hash(dto.new_password, 10);
+    member.password_hash = await bcrypt.hash(dto.new_password, 12);
     await this.memberRepo.save(member);
   }
 

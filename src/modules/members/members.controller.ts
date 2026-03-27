@@ -8,15 +8,15 @@ import {
   ParseIntPipe,
   Post,
   Patch,
-  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { MembersService } from './members.service';
 import { RegisterMemberDto } from './dto/register-member.dto';
 import { LoginMemberDto } from './dto/login-member.dto';
 import { UpdateMemberDto, ChangePasswordDto } from './dto/update-member.dto';
-import { MemberJwtGuard } from './guards/member-jwt.guard';
 import { Member } from './decorators/member.decorator';
+import { MemberAuth } from './decorators/member-auth.decorator';
 import { Member as MemberEntity } from './entities/member.entity';
 import { Public } from '../auth/decorators/public.decorator';
 import { ReservationsService } from '../reservations/reservations.service';
@@ -35,6 +35,7 @@ export class MembersController {
   ) {}
 
   @Public()
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Post('register')
   @ApiOperation({ summary: 'Registrar un nuevo miembro' })
   register(@Body() dto: RegisterMemberDto) {
@@ -42,51 +43,42 @@ export class MembersController {
   }
 
   @Public()
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Post('login')
   @ApiOperation({ summary: 'Iniciar sesión como miembro' })
   login(@Body() dto: LoginMemberDto) {
     return this.membersService.login(dto);
   }
 
-  @Public()
-  @UseGuards(MemberJwtGuard)
+  @MemberAuth()
   @Get('me')
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Obtener perfil del miembro autenticado' })
   getMe(@Member() member: MemberEntity) {
     return member;
   }
 
-  @Public()
-  @UseGuards(MemberJwtGuard)
+  @MemberAuth()
   @Patch('me')
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Actualizar perfil del miembro' })
   updateMe(@Member() member: MemberEntity, @Body() dto: UpdateMemberDto) {
     return this.membersService.updateProfile(member.id, dto);
   }
 
-  @Public()
-  @UseGuards(MemberJwtGuard)
+  @MemberAuth()
   @Patch('me/password')
   @HttpCode(200)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Cambiar contraseña del miembro' })
   changePassword(@Member() member: MemberEntity, @Body() dto: ChangePasswordDto) {
     return this.membersService.changePassword(member.id, dto);
   }
 
-  @Public()
-  @UseGuards(MemberJwtGuard)
+  @MemberAuth()
   @Post('reservations')
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Crear una reserva como miembro' })
   async createReservation(
     @Member() member: MemberEntity,
     @Body() dto: CreateReservationDto,
   ) {
-    // Prevent duplicate bookings: check if member already has an active reservation
-    // for this service and slot
     const slotStartDate = new Date(dto.slot_start);
     const existing = await this.reservationsService.findActiveMemberReservation(
       member.id,
@@ -126,19 +118,15 @@ export class MembersController {
     return reservation;
   }
 
-  @Public()
-  @UseGuards(MemberJwtGuard)
+  @MemberAuth()
   @Get('reservations')
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Listar reservas del miembro autenticado' })
   getReservations(@Member() member: MemberEntity) {
     return this.reservationsService.findByMemberId(member.id);
   }
 
-  @Public()
-  @UseGuards(MemberJwtGuard)
+  @MemberAuth()
   @Patch('reservations/:id/cancel')
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Cancelar una reserva propia del miembro' })
   cancelReservation(
     @Member() member: MemberEntity,

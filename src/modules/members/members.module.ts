@@ -14,9 +14,12 @@ import { ServicesModule } from '../services/services.module';
   imports: [
     TypeOrmModule.forFeature([Member]),
     PassportModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'dev-secret-change-in-production',
-      signOptions: { expiresIn: '30d' },
+    JwtModule.registerAsync({
+      useFactory: () => {
+        const secret = process.env.JWT_SECRET;
+        if (!secret) throw new Error('JWT_SECRET env var is required');
+        return { secret, signOptions: { expiresIn: '7d' } };
+      },
     }),
     ReservationsModule,
     MailModule,
