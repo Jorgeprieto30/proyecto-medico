@@ -26,3 +26,9 @@ Thumbs.db
 
 # TypeORM cache
 .typeorm-cache/
+
+# TypeScript build cache
+frontend/tsconfig.tsbuildinfo
+
+# Claude local settings
+.claude/settings.local.json
