@@ -1,7 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
+import { MailService } from '../mail/mail.service';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { User } from '../users/entities/user.entity';
@@ -11,6 +12,7 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
   ) {}
 
   async register(dto: CreateUserDto) {
@@ -50,6 +52,33 @@ export class AuthService {
         role: user.role,
       },
     };
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    const user = await this.usersService.findByEmail(email);
+    if (!user) return; // respuesta genérica — no revelar si el email existe
+
+    const { raw, hash } = this.usersService.generateResetToken();
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+    await this.usersService.setResetToken(user.id, hash, expires);
+
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+    const resetUrl = `${frontendUrl}/reset-password?token=${raw}`;
+
+    this.mailService.sendPasswordReset({
+      to: user.email,
+      name: user.name,
+      resetUrl,
+      userType: 'admin',
+    }).catch(() => {});
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const { createHash } = await import('crypto');
+    const hash = createHash('sha256').update(token).digest('hex');
+    const user = await this.usersService.findByResetToken(hash);
+    if (!user) throw new BadRequestException('Token inválido o expirado');
+    await this.usersService.resetPassword(user.id, newPassword);
   }
 
   async validateUser(payload: { sub: string }) {

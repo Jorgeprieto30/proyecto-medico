@@ -36,6 +36,12 @@ export class Member {
   @Column({ name: 'password_hash', nullable: true, select: false })
   password_hash: string;
 
+  @Column({ name: 'reset_password_token', type: 'varchar', length: 64, nullable: true, select: false })
+  reset_password_token: string | null;
+
+  @Column({ name: 'reset_password_expires', type: 'timestamptz', nullable: true, select: false })
+  reset_password_expires: Date | null;
+
   @ApiProperty()
   @CreateDateColumn({ name: 'created_at' })
   created_at: Date;

@@ -1,6 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
+export interface PasswordResetData {
+  to: string;
+  name: string;
+  resetUrl: string;
+  userType: 'admin' | 'member';
+}
+
 export interface ReservationConfirmationData {
   to: string;
   customerName: string;
@@ -30,6 +37,40 @@ export class MailService {
       });
     } else {
       this.logger.warn('SMTP not configured — email sending disabled');
+    }
+  }
+
+  async sendPasswordReset(data: PasswordResetData): Promise<void> {
+    if (!this.transporter) return;
+
+    const from = process.env.SMTP_FROM ?? process.env.SMTP_USER;
+    const portal = data.userType === 'admin' ? 'Panel administrativo' : 'Portal de reservas';
+
+    try {
+      await this.transporter.sendMail({
+        from: `"campus reservas" <${from}>`,
+        to: data.to,
+        subject: 'Restablecer contraseña — campus',
+        html: `
+          <div style="font-family:sans-serif;max-width:480px;margin:0 auto;color:#111">
+            <h2 style="color:#2563eb;margin-bottom:4px">Restablecer contraseña</h2>
+            <p style="margin-top:0;color:#555">Hola ${data.name}, recibimos una solicitud para restablecer la contraseña de tu cuenta en el <strong>${portal}</strong>.</p>
+            <div style="text-align:center;margin:28px 0">
+              <a href="${data.resetUrl}"
+                 style="background:#2563eb;color:#fff;text-decoration:none;padding:13px 32px;border-radius:8px;font-size:15px;font-weight:600;display:inline-block">
+                Restablecer contraseña
+              </a>
+            </div>
+            <p style="color:#6b7280;font-size:13px">Este enlace expira en <strong>1 hora</strong>. Si no solicitaste este cambio, ignora este correo.</p>
+            <p style="color:#9ca3af;font-size:12px;word-break:break-all">O copia este enlace en tu navegador:<br/>${data.resetUrl}</p>
+            <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0"/>
+            <p style="color:#9ca3af;font-size:12px">campus · ${portal}</p>
+          </div>
+        `,
+      });
+      this.logger.log(`Password reset email sent to ${data.to}`);
+    } catch (err) {
+      this.logger.error(`Failed to send password reset email to ${data.to}: ${(err as Error).message}`);
     }
   }
 

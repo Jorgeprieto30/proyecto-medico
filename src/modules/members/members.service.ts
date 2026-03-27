@@ -9,7 +9,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { Member } from './entities/member.entity';
+import { MailService } from '../mail/mail.service';
 import { RegisterMemberDto } from './dto/register-member.dto';
 import { LoginMemberDto } from './dto/login-member.dto';
 import { UpdateMemberDto, ChangePasswordDto } from './dto/update-member.dto';
@@ -20,6 +22,7 @@ export class MembersService {
     @InjectRepository(Member)
     private readonly memberRepo: Repository<Member>,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
   ) {}
 
   async register(dto: RegisterMemberDto) {
@@ -88,6 +91,50 @@ export class MembersService {
 
     member.password_hash = await bcrypt.hash(dto.new_password, 12);
     await this.memberRepo.save(member);
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    const member = await this.memberRepo.findOne({ where: { email } });
+    if (!member) return; // respuesta genérica — no revelar si el email existe
+
+    const raw = crypto.randomBytes(32).toString('hex');
+    const hash = crypto.createHash('sha256').update(raw).digest('hex');
+    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+
+    await this.memberRepo.update(member.id, {
+      reset_password_token: hash,
+      reset_password_expires: expires,
+    });
+
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+    const resetUrl = `${frontendUrl}/portal/reset-password?token=${raw}`;
+
+    this.mailService.sendPasswordReset({
+      to: member.email,
+      name: member.first_name,
+      resetUrl,
+      userType: 'member',
+    }).catch(() => {});
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const hash = crypto.createHash('sha256').update(token).digest('hex');
+    const member = await this.memberRepo
+      .createQueryBuilder('m')
+      .addSelect('m.reset_password_token')
+      .addSelect('m.reset_password_expires')
+      .where('m.reset_password_token = :hash', { hash })
+      .andWhere('m.reset_password_expires > NOW()')
+      .getOne();
+
+    if (!member) throw new BadRequestException('Token inválido o expirado');
+
+    const password_hash = await bcrypt.hash(newPassword, 12);
+    await this.memberRepo.update(member.id, {
+      password_hash,
+      reset_password_token: null,
+      reset_password_expires: null,
+    });
   }
 
   private buildResponse(member: Member) {

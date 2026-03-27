@@ -35,6 +35,12 @@ export class User {
   @Column({ name: 'center_code', type: 'varchar', length: 100, nullable: true, unique: true })
   center_code: string | null;
 
+  @Column({ name: 'reset_password_token', type: 'varchar', length: 64, nullable: true, select: false })
+  reset_password_token: string | null;
+
+  @Column({ name: 'reset_password_expires', type: 'timestamptz', nullable: true, select: false })
+  reset_password_expires: Date | null;
+
   @CreateDateColumn()
   created_at: Date;
 

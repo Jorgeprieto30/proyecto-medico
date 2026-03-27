@@ -6,7 +6,7 @@ import { getMemberProfile, getMemberToken, memberLogout, type MemberProfile } fr
 import { useRouter, usePathname } from 'next/navigation';
 
 // Routes that don't require authentication
-const PUBLIC_PATHS = ['/portal/login', '/portal/register'];
+const PUBLIC_PATHS = ['/portal/login', '/portal/register', '/portal/forgot-password', '/portal/reset-password'];
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();

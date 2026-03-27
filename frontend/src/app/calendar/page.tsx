@@ -814,7 +814,7 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
               onClick={() => {
                 const dateStr = new Date(slot.slot_start).toLocaleDateString('es-CL', {
                   weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-                  timeZone: slot.timezone,
+                  timeZone: slot.timezone || 'UTC',
                 });
                 const startTime = formatHHMM(slot.slot_start, slot.timezone);
                 const endTime   = formatHHMM(slot.slot_end, slot.timezone);

@@ -15,6 +15,8 @@ import { MembersService } from './members.service';
 import { RegisterMemberDto } from './dto/register-member.dto';
 import { LoginMemberDto } from './dto/login-member.dto';
 import { UpdateMemberDto, ChangePasswordDto } from './dto/update-member.dto';
+import { ForgotPasswordMemberDto } from './dto/forgot-password-member.dto';
+import { ResetPasswordMemberDto } from './dto/reset-password-member.dto';
 import { Member } from './decorators/member.decorator';
 import { MemberAuth } from './decorators/member-auth.decorator';
 import { Member as MemberEntity } from './entities/member.entity';
@@ -48,6 +50,26 @@ export class MembersController {
   @ApiOperation({ summary: 'Iniciar sesión como miembro' })
   login(@Body() dto: LoginMemberDto) {
     return this.membersService.login(dto);
+  }
+
+  @Public()
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  @Post('forgot-password')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Solicitar enlace de recuperación de contraseña' })
+  async forgotPassword(@Body() dto: ForgotPasswordMemberDto) {
+    await this.membersService.forgotPassword(dto.email);
+    return { message: 'Si el email está registrado, recibirás un enlace de recuperación en los próximos minutos.' };
+  }
+
+  @Public()
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  @Post('reset-password')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Restablecer contraseña con token' })
+  async resetPassword(@Body() dto: ResetPasswordMemberDto) {
+    await this.membersService.resetPassword(dto.token, dto.password);
+    return { message: 'Contraseña actualizada correctamente.' };
   }
 
   @MemberAuth()

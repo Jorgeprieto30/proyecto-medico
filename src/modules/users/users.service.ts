@@ -2,6 +2,7 @@ import { Injectable, ConflictException, NotFoundException } from '@nestjs/common
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 
@@ -70,6 +71,38 @@ export class UsersService {
       ],
       select: ['id', 'center_name', 'center_code'],
     });
+  }
+
+  async setResetToken(userId: string, tokenHash: string, expires: Date): Promise<void> {
+    await this.userRepo.update(userId, {
+      reset_password_token: tokenHash,
+      reset_password_expires: expires,
+    });
+  }
+
+  async findByResetToken(tokenHash: string): Promise<User | null> {
+    return this.userRepo
+      .createQueryBuilder('u')
+      .addSelect('u.reset_password_token')
+      .addSelect('u.reset_password_expires')
+      .where('u.reset_password_token = :tokenHash', { tokenHash })
+      .andWhere('u.reset_password_expires > NOW()')
+      .getOne();
+  }
+
+  async resetPassword(userId: string, newPassword: string): Promise<void> {
+    const password_hash = await bcrypt.hash(newPassword, 12);
+    await this.userRepo.update(userId, {
+      password_hash,
+      reset_password_token: null,
+      reset_password_expires: null,
+    });
+  }
+
+  generateResetToken(): { raw: string; hash: string } {
+    const raw = crypto.randomBytes(32).toString('hex');
+    const hash = crypto.createHash('sha256').update(raw).digest('hex');
+    return { raw, hash };
   }
 
   async findOrCreateGoogleUser(data: {

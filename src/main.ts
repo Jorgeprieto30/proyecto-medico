@@ -19,22 +19,25 @@ async function bootstrap() {
     .map((u) => u.trim())
     .filter(Boolean);
 
-  // En desarrollo, permitir localhost si no se configuró nada
-  if (allowedOrigins.length === 0 && process.env.NODE_ENV !== 'production') {
-    allowedOrigins.push('http://localhost:3001', 'http://localhost:3000');
+  if (allowedOrigins.length === 0) {
+    // Sin FRONTEND_URLS configurado: modo abierto con advertencia
+    console.warn(
+      '⚠️  FRONTEND_URLS no configurado — CORS abierto. Define FRONTEND_URLS=https://tu-frontend.com en producción.',
+    );
+    app.enableCors({ credentials: true });
+  } else {
+    app.enableCors({
+      origin: (origin, callback) => {
+        // Permitir requests sin origin (Postman, curl, SSR)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        callback(new Error(`CORS bloqueado: origen no permitido (${origin})`));
+      },
+      credentials: true,
+      methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+    });
   }
-
-  app.enableCors({
-    origin: (origin, callback) => {
-      // Permitir requests sin origin (Swagger, Postman, curl)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      callback(new Error(`CORS bloqueado: origen no permitido (${origin})`));
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  });
 
   // ── Prefijo global de API ───────────────────────────────────────────────────
   app.setGlobalPrefix('api/v1');

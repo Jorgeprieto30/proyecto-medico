@@ -1,9 +1,11 @@
-import { Controller, Post, Get, Body, Request } from '@nestjs/common';
+import { Controller, Post, Get, Body, HttpCode, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { Public } from './decorators/public.decorator';
 
 @ApiTags('auth')
@@ -41,6 +43,26 @@ export class AuthController {
     },
   ) {
     return this.authService.googleLogin(body);
+  }
+
+  @Public()
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  @Post('forgot-password')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Solicitar enlace de recuperación de contraseña' })
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.authService.forgotPassword(dto.email);
+    return { message: 'Si el email está registrado, recibirás un enlace de recuperación en los próximos minutos.' };
+  }
+
+  @Public()
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  @Post('reset-password')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Restablecer contraseña con token' })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.authService.resetPassword(dto.token, dto.password);
+    return { message: 'Contraseña actualizada correctamente.' };
   }
 
   @Get('me')
