@@ -22,7 +22,7 @@ import { PageSpinner } from '@/components/ui/spinner';
 
 const DAY_START_HOUR = 6;
 const DAY_END_HOUR   = 22;
-const HOUR_HEIGHT_PX = 64;
+const HOUR_HEIGHT_PX = 44;
 const TOTAL_HEIGHT   = (DAY_END_HOUR - DAY_START_HOUR) * HOUR_HEIGHT_PX;
 
 const COLORS = [
@@ -405,7 +405,7 @@ function DayView({
 
   return (
     <div className="border rounded-xl overflow-hidden bg-white">
-      <div className="flex">
+      <div className="flex overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
         {/* Time gutter */}
         <div className="w-16 shrink-0 border-r border-gray-100 relative" style={{ height: TOTAL_HEIGHT + HOUR_HEIGHT_PX }}>
           {hourLabels.map((label, i) => (
@@ -520,7 +520,7 @@ function WeekView({
       </div>
 
       {/* Grid body */}
-      <div className="flex">
+      <div className="flex overflow-y-auto" style={{ maxHeight: 'calc(100vh - 340px)' }}>
         {/* Time gutter */}
         <div className="w-16 shrink-0 border-r border-gray-100 relative" style={{ height: TOTAL_HEIGHT + HOUR_HEIGHT_PX }}>
           {hourLabels.map((label, i) => (
