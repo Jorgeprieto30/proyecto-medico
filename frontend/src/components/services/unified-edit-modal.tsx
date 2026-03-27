@@ -92,6 +92,7 @@ export function UnifiedEditModal({
           {activeTab === 'general' && (
             <GeneralTab
               serviceId={serviceId}
+              onSaved={handleClose}
               initialValues={service ? {
                 name: service.name,
                 description: service.description ?? '',
@@ -116,9 +117,11 @@ export function UnifiedEditModal({
 
 function GeneralTab({
   serviceId,
+  onSaved,
   initialValues,
 }: {
   serviceId: string;
+  onSaved: () => void;
   initialValues?: GeneralForm;
 }) {
   const qc = useQueryClient();
@@ -143,6 +146,7 @@ function GeneralTab({
       qc.invalidateQueries({ queryKey: ['services'] });
       qc.invalidateQueries({ queryKey: ['services', serviceId] });
       toast.success('Evento actualizado');
+      onSaved();
     },
     onError: (e: Error) => toast.error(e.message),
   });
