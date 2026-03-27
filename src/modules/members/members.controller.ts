@@ -1,5 +1,6 @@
 import {
   Body,
+  ConflictException,
   Controller,
   Get,
   HttpCode,
@@ -84,6 +85,18 @@ export class MembersController {
     @Member() member: MemberEntity,
     @Body() dto: CreateReservationDto,
   ) {
+    // Prevent duplicate bookings: check if member already has an active reservation
+    // for this service and slot
+    const slotStartDate = new Date(dto.slot_start);
+    const existing = await this.reservationsService.findActiveMemberReservation(
+      member.id,
+      dto.service_id,
+      slotStartDate,
+    );
+    if (existing) {
+      throw new ConflictException('DUPLICATE_BOOKING');
+    }
+
     const enrichedDto: CreateReservationDto = {
       ...dto,
       customer_name: dto.customer_name ?? `${member.first_name} ${member.last_name}`,
@@ -95,19 +108,20 @@ export class MembersController {
     };
     const reservation = await this.reservationsService.create(enrichedDto);
 
-    // Send confirmation email (fire-and-forget)
-    try {
-      const service = await this.servicesService.findOne(dto.service_id);
-      this.mailService.sendReservationConfirmation({
-        to: member.email,
-        customerName: `${member.first_name} ${member.last_name}`,
-        serviceName: service.name,
-        slotStart: reservation.slotStart,
-        slotEnd: reservation.slotEnd,
-        timezone: service.timezone,
-        reservationId: reservation.id,
-      });
-    } catch { /* non-critical */ }
+    // Send confirmation email (fire-and-forget, errors are non-critical)
+    this.servicesService.findOne(dto.service_id)
+      .then((service) =>
+        this.mailService.sendReservationConfirmation({
+          to: member.email,
+          customerName: `${member.first_name} ${member.last_name}`,
+          serviceName: service.name,
+          slotStart: reservation.slotStart,
+          slotEnd: reservation.slotEnd,
+          timezone: service.timezone,
+          reservationId: reservation.id,
+        }),
+      )
+      .catch(() => { /* non-critical */ });
 
     return reservation;
   }

@@ -66,6 +66,10 @@ export default function PerfilPage() {
         }),
       });
       const json = await res.json();
+      if (res.status === 401) {
+        router.replace('/portal/login?redirect=/portal/perfil');
+        return;
+      }
       if (!res.ok) {
         setProfileError(Array.isArray(json.message) ? json.message.join(', ') : json.message || 'Error al guardar');
         return;
@@ -107,6 +111,10 @@ export default function PerfilPage() {
         body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
       });
       const json = await res.json();
+      if (res.status === 401) {
+        router.replace('/portal/login?redirect=/portal/perfil');
+        return;
+      }
       if (!res.ok) {
         setPasswordError(Array.isArray(json.message) ? json.message.join(', ') : json.message || 'Error al cambiar contraseña');
         return;
@@ -124,7 +132,7 @@ export default function PerfilPage() {
 
   const handleLogout = () => {
     memberLogout();
-    router.push('/portal');
+    router.push('/');
   };
 
   return (

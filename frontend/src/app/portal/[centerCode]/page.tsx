@@ -119,8 +119,30 @@ function BookingModal({ booking, onClose, onConfirm, memberProfile }: {
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState('');
   const [confirmed, setConfirmed] = useState<ConfirmedReservation | null>(null);
+  // Set of slot_start UTC strings the member already booked (active reservations)
+  const [bookedSlots, setBookedSlots] = useState<Set<string>>(new Set());
 
   const hasNamedSpots = !!booking.service.spotLabel;
+
+  // Load member's existing active reservations for this service on mount
+  useEffect(() => {
+    const token = getMemberToken();
+    if (!token) return;
+    fetch(`${BASE}/members/reservations`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(json => {
+        if (!json) return;
+        const list: Array<{ serviceId: string; slotStart: string; status: string }> = json.data ?? json;
+        const booked = new Set(
+          list
+            .filter(r => r.serviceId === booking.service.id && (r.status === 'confirmed' || r.status === 'pending'))
+            .map(r => r.slotStart),
+        );
+        setBookedSlots(booked);
+      })
+      .catch(() => { /* non-critical */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [booking.service.id]);
   const STEPS: BookingStep[] = hasNamedSpots ? ['date', 'slot', 'spot'] : ['date', 'slot'];
   const stepIdx = STEPS.indexOf(step === 'success' ? (hasNamedSpots ? 'spot' : 'slot') : step);
   const spotLabel = spotsData?.spot_label ?? booking.service.spotLabel;
@@ -178,7 +200,11 @@ function BookingModal({ booking, onClose, onConfirm, memberProfile }: {
       const result = await onConfirm(selectedSlot, hasNamedSpots ? selectedSpot : null, name, rut);
       setConfirmed(result); setStep('success');
     } catch (e: any) {
-      setConfirmError(e.message || 'Error al confirmar la reserva');
+      if (e.message === 'DUPLICATE_BOOKING') {
+        setConfirmError('DUPLICATE_BOOKING');
+      } else {
+        setConfirmError(e.message || 'Error al confirmar la reserva');
+      }
     } finally { setConfirming(false); }
   };
 
@@ -291,7 +317,22 @@ function BookingModal({ booking, onClose, onConfirm, memberProfile }: {
                 <div className="grid grid-cols-2 gap-2">
                   {slots.map((slot) => {
                     const isSelected = selectedSlot?.slot_start === slot.slot_start;
+                    const alreadyBooked = bookedSlots.has(slot.slot_start);
                     const pct = slot.capacity > 0 ? slot.available / slot.capacity : 0;
+
+                    if (alreadyBooked) {
+                      return (
+                        <a key={slot.slot_start} href="/portal/mis-reservas"
+                          className="p-3 border-2 border-blue-200 bg-blue-50 rounded-xl text-left block">
+                          <p className="font-semibold text-sm text-blue-700">
+                            {formatSlotTime(slot.slot_start, booking.service.timezone)}
+                          </p>
+                          <p className="text-xs text-blue-500 mt-0.5 font-medium">✓ Ya reservaste</p>
+                          <p className="text-[11px] text-blue-400 mt-0.5 underline">Manejar mis reservas →</p>
+                        </a>
+                      );
+                    }
+
                     const bgClass = !slot.bookable ? 'bg-gray-50 border-gray-100 opacity-50 cursor-not-allowed'
                       : isSelected ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100'
                       : pct <= 0 ? 'bg-red-50 border-red-100 opacity-60 cursor-not-allowed'
@@ -316,11 +357,18 @@ function BookingModal({ booking, onClose, onConfirm, memberProfile }: {
                   })}
                 </div>
               )}
-              {confirmError && (
+              {confirmError === 'DUPLICATE_BOOKING' ? (
+                <div className="mt-3 flex items-start gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-sm rounded-xl px-4 py-3">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  <span>Ya tienes una reserva para este horario.{' '}
+                    <a href="/portal/mis-reservas" className="underline font-medium">Manejar mis reservas →</a>
+                  </span>
+                </div>
+              ) : confirmError ? (
                 <div className="mt-3 flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
                   <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" /><span>{confirmError}</span>
                 </div>
-              )}
+              ) : null}
             </div>
           )}
 

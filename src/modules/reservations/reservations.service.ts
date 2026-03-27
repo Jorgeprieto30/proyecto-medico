@@ -207,4 +207,19 @@ export class ReservationsService {
       .orderBy('r.slot_start', 'DESC')
       .getMany();
   }
+
+  async findActiveMemberReservation(
+    memberId: string,
+    serviceId: string,
+    slotStart: Date,
+  ): Promise<Reservation | null> {
+    return this.reservationRepo.findOne({
+      where: {
+        memberId,
+        serviceId,
+        slotStart,
+        status: In(ACTIVE_STATUSES),
+      },
+    });
+  }
 }
