@@ -62,7 +62,7 @@ export class AuthService {
     const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
     await this.usersService.setResetToken(user.id, hash, expires);
 
-    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+    const frontendUrl = process.env.FRONTEND_URLS?.split(',')[0]?.trim() ?? 'http://localhost:3001';
     const resetUrl = `${frontendUrl}/reset-password?token=${raw}`;
 
     this.mailService.sendPasswordReset({

@@ -90,8 +90,9 @@ export class MembersController {
   @Patch('me/password')
   @HttpCode(200)
   @ApiOperation({ summary: 'Cambiar contraseña del miembro' })
-  changePassword(@Member() member: MemberEntity, @Body() dto: ChangePasswordDto) {
-    return this.membersService.changePassword(member.id, dto);
+  async changePassword(@Member() member: MemberEntity, @Body() dto: ChangePasswordDto) {
+    await this.membersService.changePassword(member.id, dto);
+    return { message: 'Contraseña actualizada correctamente.' };
   }
 
   @MemberAuth()

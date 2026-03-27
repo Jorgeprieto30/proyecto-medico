@@ -106,7 +106,7 @@ export class MembersService {
       reset_password_expires: expires,
     });
 
-    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+    const frontendUrl = process.env.FRONTEND_URLS?.split(',')[0]?.trim() ?? 'http://localhost:3001';
     const resetUrl = `${frontendUrl}/portal/reset-password?token=${raw}`;
 
     this.mailService.sendPasswordReset({

@@ -46,6 +46,7 @@ export default function MisReservasPage() {
       .then(async (r) => {
         if (r.status === 401) {
           router.replace('/portal/login?redirect=/portal/mis-reservas');
+          setLoading(false);
           return;
         }
         const json = await r.json();
