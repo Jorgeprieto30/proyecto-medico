@@ -32,6 +32,7 @@ export class MembersService {
       last_name: dto.last_name,
       email: dto.email,
       rut: dto.rut ?? null,
+      birth_date: dto.birth_date ?? null,
       password_hash,
     });
     const saved = await this.memberRepo.save(member);
@@ -68,6 +69,7 @@ export class MembersService {
     if (dto.first_name !== undefined) member.first_name = dto.first_name;
     if (dto.last_name !== undefined) member.last_name = dto.last_name;
     if (dto.rut !== undefined) member.rut = dto.rut;
+    if (dto.birth_date !== undefined) member.birth_date = dto.birth_date;
     return this.memberRepo.save(member);
   }
 
@@ -98,6 +100,7 @@ export class MembersService {
         last_name: member.last_name,
         email: member.email,
         rut: member.rut,
+        birth_date: member.birth_date ?? null,
       },
     };
   }
