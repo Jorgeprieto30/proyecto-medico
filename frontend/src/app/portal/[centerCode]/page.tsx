@@ -61,7 +61,7 @@ interface SlotSpots {
   spots: SpotInfo[];
 }
 
-type BookingStep = 'date' | 'slot' | 'spot' | 'confirm';
+type BookingStep = 'date' | 'slot' | 'spot';
 
 interface BookingState {
   service: Service;
@@ -122,10 +122,6 @@ function BookingModal({
   const [loadingSpots, setLoadingSpots] = useState(false);
   const [selectedSpot, setSelectedSpot] = useState<number | null>(booking.spotNumber);
   const [step, setStep] = useState<BookingStep>(booking.step);
-  const [customerName, setCustomerName] = useState(
-    memberProfile ? `${memberProfile.first_name} ${memberProfile.last_name}` : '',
-  );
-  const [customerRut, setCustomerRut] = useState(memberProfile?.rut ?? '');
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState('');
 
@@ -198,7 +194,11 @@ function BookingModal({
     setConfirming(true);
     setConfirmError('');
     try {
-      await onConfirm(selectedSlot, selectedSpot, customerName, customerRut);
+      const name = memberProfile
+        ? `${memberProfile.first_name} ${memberProfile.last_name}`
+        : '';
+      const rut = memberProfile?.rut ?? '';
+      await onConfirm(selectedSlot, selectedSpot, name, rut);
     } catch (e: any) {
       setConfirmError(e.message || 'Error al confirmar la reserva');
     } finally {
@@ -206,7 +206,7 @@ function BookingModal({
     }
   };
 
-  const STEPS: BookingStep[] = ['date', 'slot', 'spot', 'confirm'];
+  const STEPS: BookingStep[] = ['date', 'slot', 'spot'];
   const stepIdx = STEPS.indexOf(step);
 
   const spotLabel = spotsData?.spot_label ?? booking.service.spotLabel;
@@ -222,7 +222,6 @@ function BookingModal({
               {step === 'date' && 'Selecciona una fecha'}
               {step === 'slot' && 'Selecciona un horario'}
               {step === 'spot' && `Elige tu ${spotLabel ?? 'cupo'}`}
-              {step === 'confirm' && 'Confirma tu reserva'}
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -400,53 +399,10 @@ function BookingModal({
             </div>
           )}
 
-          {/* Step 4: Confirm */}
-          {step === 'confirm' && selectedSlot && selectedSpot !== null && (
-            <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                <p className="text-sm font-medium text-blue-900">{booking.service.name}</p>
-                <p className="text-sm text-blue-700 mt-1">
-                  {formatSlotDate(`${date}T12:00:00`, booking.service.timezone)}
-                </p>
-                <p className="text-sm text-blue-700">
-                  {formatSlotTime(selectedSlot.slot_start, booking.service.timezone)} –{' '}
-                  {formatSlotTime(selectedSlot.slot_end, booking.service.timezone)}
-                </p>
-                <p className="text-sm font-semibold text-blue-800 mt-1">
-                  {spotLabel ? `${spotLabel} ${selectedSpot}` : `Cupo #${selectedSpot}`}
-                </p>
-              </div>
-
-              {confirmError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
-                  {confirmError}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre completo
-                </label>
-                <input
-                  type="text"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  RUT <span className="text-gray-400 font-normal">(opcional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={customerRut}
-                  onChange={(e) => setCustomerRut(e.target.value)}
-                  placeholder="12.345.678-9"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+          {/* Error al confirmar */}
+          {step === 'spot' && confirmError && (
+            <div className="mt-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+              {confirmError}
             </div>
           )}
         </div>
@@ -457,8 +413,7 @@ function BookingModal({
             <button
               onClick={() => {
                 if (step === 'slot') setStep('date');
-                else if (step === 'spot') setStep('slot');
-                else if (step === 'confirm') setStep('spot');
+                else if (step === 'spot') { setConfirmError(''); setStep('slot'); }
               }}
               className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg hover:bg-gray-50"
             >
@@ -467,17 +422,15 @@ function BookingModal({
             <button
               disabled={
                 (step === 'slot' && !selectedSlot) ||
-                (step === 'spot' && selectedSpot === null) ||
-                (step === 'confirm' && (!customerName.trim() || confirming))
+                (step === 'spot' && (selectedSpot === null || confirming))
               }
               onClick={() => {
                 if (step === 'slot' && selectedSlot) setStep('spot');
-                else if (step === 'spot' && selectedSpot !== null) setStep('confirm');
-                else if (step === 'confirm') handleConfirm();
+                else if (step === 'spot') handleConfirm();
               }}
               className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {step === 'confirm' ? (confirming ? 'Confirmando...' : 'Confirmar reserva') : 'Siguiente'}
+              {step === 'spot' ? (confirming ? 'Reservando...' : 'Confirmar reserva') : 'Siguiente'}
             </button>
           </div>
         )}
