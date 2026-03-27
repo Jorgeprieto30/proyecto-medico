@@ -6,7 +6,7 @@ import { getMemberProfile, getMemberToken, memberLogout, type MemberProfile } fr
 import { useRouter, usePathname } from 'next/navigation';
 
 // Routes that don't require authentication
-const PUBLIC_PATHS = ['/portal', '/portal/login', '/portal/register'];
+const PUBLIC_PATHS = ['/portal/login', '/portal/register'];
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -28,7 +28,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const handleLogout = () => {
     memberLogout();
     setProfile(null);
-    router.push('/portal');
+    router.push('/');
   };
 
   // Don't render protected content until auth is confirmed
