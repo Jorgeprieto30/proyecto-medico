@@ -57,35 +57,66 @@ export class ReservationsService {
       );
     }
 
-    // Validar que spot_number esté dentro del rango de cupos
-    if (dto.spot_number < 1 || dto.spot_number > slotInfo.capacity) {
+    // Validar spot_number si viene explícito
+    if (dto.spot_number != null && (dto.spot_number < 1 || dto.spot_number > slotInfo.capacity)) {
       throw new BadRequestException(
         `Cupo ${dto.spot_number} inválido. Rango permitido: 1–${slotInfo.capacity}`,
       );
     }
 
     return this.dataSource.transaction(async (manager) => {
-      // Advisory lock por (service_id, slot_start, spot_number) — permite reservar cupos distintos en paralelo
-      const lockKey = `${dto.service_id}|${slotStartUtc.toISOString()}|${dto.spot_number}`;
-      await manager.query(
-        `SELECT pg_advisory_xact_lock(('x' || substr(md5($1), 1, 16))::bit(64)::bigint)`,
-        [lockKey],
-      );
+      let spotNumber: number;
 
-      // Verificar que el cupo específico no esté tomado
-      const existingSpot = await manager.getRepository(Reservation).findOne({
-        where: {
-          serviceId: dto.service_id,
-          slotStart: slotStartUtc,
-          spotNumber: dto.spot_number,
-          status: In(ACTIVE_STATUSES),
-        },
-      });
-
-      if (existingSpot) {
-        throw new ConflictException(
-          `El cupo ${dto.spot_number} ya está ocupado para el horario ${dto.slot_start}`,
+      if (dto.spot_number != null) {
+        // ── Cupo específico elegido por el cliente ─────────────────────────
+        const lockKey = `${dto.service_id}|${slotStartUtc.toISOString()}|${dto.spot_number}`;
+        await manager.query(
+          `SELECT pg_advisory_xact_lock(('x' || substr(md5($1), 1, 16))::bit(64)::bigint)`,
+          [lockKey],
         );
+
+        const existingSpot = await manager.getRepository(Reservation).findOne({
+          where: {
+            serviceId: dto.service_id,
+            slotStart: slotStartUtc,
+            spotNumber: dto.spot_number,
+            status: In(ACTIVE_STATUSES),
+          },
+        });
+
+        if (existingSpot) {
+          throw new ConflictException(
+            `El cupo ${dto.spot_number} ya está ocupado para el horario ${dto.slot_start}`,
+          );
+        }
+
+        spotNumber = dto.spot_number;
+      } else {
+        // ── Auto-asignación: lock a nivel de slot completo ─────────────────
+        const slotLockKey = `${dto.service_id}|${slotStartUtc.toISOString()}`;
+        await manager.query(
+          `SELECT pg_advisory_xact_lock(('x' || substr(md5($1), 1, 16))::bit(64)::bigint)`,
+          [slotLockKey],
+        );
+
+        const takenSpots = await manager.getRepository(Reservation).find({
+          where: {
+            serviceId: dto.service_id,
+            slotStart: slotStartUtc,
+            status: In(ACTIVE_STATUSES),
+          },
+          select: ['spotNumber'],
+        });
+
+        const takenSet = new Set(takenSpots.map((r) => r.spotNumber));
+        const available = Array.from({ length: slotInfo.capacity }, (_, i) => i + 1)
+          .find((n) => !takenSet.has(n));
+
+        if (available == null) {
+          throw new ConflictException(`No hay cupos disponibles para el horario ${dto.slot_start}`);
+        }
+
+        spotNumber = available;
       }
 
       const memberId: string | null =
@@ -98,7 +129,7 @@ export class ReservationsService {
         status: ReservationStatus.CONFIRMED,
         customerName: dto.customer_name ?? null,
         customerExternalId: dto.customer_external_id ?? null,
-        spotNumber: dto.spot_number,
+        spotNumber,
         memberId,
         metadata: dto.metadata ?? null,
       });

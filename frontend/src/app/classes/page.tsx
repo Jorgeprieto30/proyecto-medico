@@ -47,6 +47,7 @@ const createSchema = z.object({
   timezone:            z.string().min(1),
   slotDurationMinutes: z.coerce.number().min(5).max(480),
   maxSpots:            z.coerce.number().min(1, 'Mínimo 1').max(500, 'Máximo 500'),
+  namedSpots:          z.boolean(),
   spotLabel:           z.string().optional(),
   days:                z.array(z.number()).min(1, 'Selecciona al menos un día'),
   timeSlots: z.array(timeSlotSchema).min(1, 'Agrega al menos un horario'),
@@ -57,7 +58,7 @@ type CreateForm = z.infer<typeof createSchema>;
 
 const DEFAULT_CREATE: CreateForm = {
   name: '', description: '', timezone: 'America/Santiago',
-  slotDurationMinutes: 60, maxSpots: 20, spotLabel: '',
+  slotDurationMinutes: 60, maxSpots: 20, namedSpots: false, spotLabel: '',
   days: [],
   timeSlots: [{ startTime: '08:00', endTime: '09:00' }],
   validFrom: todayAsString(), validUntil: '',
@@ -91,6 +92,7 @@ export default function EventosPage() {
   });
 
   const selectedDays = watch('days');
+  const namedSpots = watch('namedSpots');
 
   const openCreate = () => { reset(DEFAULT_CREATE); setCreateOpen(true); };
 
@@ -102,7 +104,7 @@ export default function EventosPage() {
         timezone: data.timezone,
         slotDurationMinutes: data.slotDurationMinutes,
         maxSpots: data.maxSpots,
-        spotLabel: data.spotLabel || undefined,
+        spotLabel: data.namedSpots ? (data.spotLabel || undefined) : undefined,
       });
       for (const day of data.days) {
         for (const slot of data.timeSlots) {
@@ -218,13 +220,46 @@ export default function EventosPage() {
             <div>
               <Label>Cupos máximos por sesión *</Label>
               <Input type="number" min={1} max={500} {...register('maxSpots')} className="mt-1" placeholder="20" />
-              <p className="text-xs text-gray-400 mt-0.5">Cantidad total de cupos numerados (ej: 20 bicicletas)</p>
               {errors.maxSpots && <p className="text-xs text-red-500 mt-1">{errors.maxSpots.message}</p>}
             </div>
             <div className="col-span-2">
-              <Label>Etiqueta de cupo (opcional)</Label>
-              <Input {...register('spotLabel')} className="mt-1" placeholder='ej: "Bici" → muestra "Bici 1", "Bici 2"…' />
-              <p className="text-xs text-gray-400 mt-0.5">Si se deja vacío, se muestra solo el número</p>
+              <div className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Cupos numerados</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {namedSpots
+                      ? 'Los clientes eligen un cupo específico (ej: Bici 1, Bici 2…)'
+                      : 'Los clientes reservan sin elegir cupo específico'}
+                  </p>
+                </div>
+                <Controller
+                  name="namedSpots"
+                  control={control}
+                  render={({ field }) => (
+                    <button
+                      type="button"
+                      onClick={() => field.onChange(!field.value)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        field.value ? 'bg-blue-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                        field.value ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  )}
+                />
+              </div>
+              {namedSpots && (
+                <div className="mt-2">
+                  <Input
+                    {...register('spotLabel')}
+                    className="mt-1"
+                    placeholder='Nombre del cupo, ej: "Bici" → muestra "Bici 1", "Bici 2"…'
+                  />
+                  <p className="text-xs text-gray-400 mt-0.5">Si se deja vacío, se muestra solo el número</p>
+                </div>
+              )}
             </div>
           </div>
 

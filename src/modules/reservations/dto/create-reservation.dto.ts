@@ -24,10 +24,11 @@ export class CreateReservationDto {
   @IsOptional()
   customer_external_id?: string;
 
-  @ApiProperty({ example: 5, description: 'Número de cupo a reservar (1..max_spots del servicio)' })
+  @ApiPropertyOptional({ example: 5, description: 'Número de cupo a reservar (1..max_spots). Omitir para auto-asignación cuando el servicio no requiere selección de cupo.' })
   @IsInt()
   @Min(1)
-  spot_number: number;
+  @IsOptional()
+  spot_number?: number;
 
   @ApiPropertyOptional({ example: { source: 'internal' } })
   @IsObject()

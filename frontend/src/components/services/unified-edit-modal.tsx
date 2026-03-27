@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -36,6 +36,7 @@ const generalSchema = z.object({
   timezone:            z.string().min(1),
   slotDurationMinutes: z.coerce.number().min(5).max(480),
   maxSpots:            z.coerce.number().min(1, 'Mínimo 1').max(500, 'Máximo 500'),
+  namedSpots:          z.boolean(),
   spotLabel:           z.string().optional(),
 });
 type GeneralForm = z.infer<typeof generalSchema>;
@@ -97,6 +98,7 @@ export function UnifiedEditModal({
                 timezone: service.timezone,
                 slotDurationMinutes: service.slotDurationMinutes,
                 maxSpots: service.maxSpots,
+                namedSpots: !!service.spotLabel,
                 spotLabel: service.spotLabel ?? '',
               } : undefined}
             />
@@ -121,13 +123,19 @@ function GeneralTab({
 }) {
   const qc = useQueryClient();
 
-  const { register, handleSubmit, formState: { errors } } = useForm<GeneralForm>({
+  const { register, handleSubmit, control, watch, formState: { errors } } = useForm<GeneralForm>({
     resolver: zodResolver(generalSchema),
     values: initialValues,
   });
 
+  const namedSpots = watch('namedSpots');
+
   const saveMutation = useMutation({
-    mutationFn: (data: GeneralForm) => servicesApi.update(serviceId, data),
+    mutationFn: (data: GeneralForm) =>
+      servicesApi.update(serviceId, {
+        ...data,
+        spotLabel: data.namedSpots ? (data.spotLabel || undefined) : undefined,
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['services'] });
       qc.invalidateQueries({ queryKey: ['services', serviceId] });
@@ -180,8 +188,43 @@ function GeneralTab({
         </div>
 
         <div className="col-span-2">
-          <Label>Etiqueta de cupo (opcional)</Label>
-          <Input {...register('spotLabel')} className="mt-1" placeholder='ej: "Bici" → "Bici 1", "Bici 2"…' />
+          <div className="flex items-center justify-between p-3 border rounded-lg bg-gray-50">
+            <div>
+              <p className="text-sm font-medium text-gray-700">Cupos numerados</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {namedSpots
+                  ? 'Los clientes eligen un cupo específico (ej: Bici 1, Bici 2…)'
+                  : 'Los clientes reservan sin elegir cupo específico'}
+              </p>
+            </div>
+            <Controller
+              name="namedSpots"
+              control={control}
+              render={({ field }) => (
+                <button
+                  type="button"
+                  onClick={() => field.onChange(!field.value)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    field.value ? 'bg-blue-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    field.value ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+              )}
+            />
+          </div>
+          {namedSpots && (
+            <div className="mt-2">
+              <Input
+                {...register('spotLabel')}
+                className="mt-1"
+                placeholder='Nombre del cupo, ej: "Bici" → muestra "Bici 1", "Bici 2"…'
+              />
+              <p className="text-xs text-gray-400 mt-0.5">Si se deja vacío, se muestra solo el número</p>
+            </div>
+          )}
         </div>
       </div>
 

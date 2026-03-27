@@ -106,7 +106,7 @@ function BookingModal({
 }: {
   booking: BookingState;
   onClose: () => void;
-  onConfirm: (slot: Slot, spotNumber: number, name: string, rut: string) => Promise<void>;
+  onConfirm: (slot: Slot, spotNumber: number | null, name: string, rut: string) => Promise<void>;
   memberProfile: MemberProfile | null;
 }) {
   const today = todayAsString();
@@ -178,6 +178,8 @@ function BookingModal({
     return () => { cancelled = true; };
   }, [step, year, month, allDays, booking.service.id, today]);
 
+  const hasNamedSpots = !!booking.service.spotLabel;
+
   useEffect(() => {
     if (step === 'slot') loadSlots(date);
   }, [step, date, loadSlots]);
@@ -190,7 +192,8 @@ function BookingModal({
   }, [step, selectedSlot, loadSpots]);
 
   const handleConfirm = async () => {
-    if (!selectedSlot || selectedSpot === null) return;
+    if (!selectedSlot) return;
+    if (hasNamedSpots && selectedSpot === null) return;
     setConfirming(true);
     setConfirmError('');
     try {
@@ -198,7 +201,7 @@ function BookingModal({
         ? `${memberProfile.first_name} ${memberProfile.last_name}`
         : '';
       const rut = memberProfile?.rut ?? '';
-      await onConfirm(selectedSlot, selectedSpot, name, rut);
+      await onConfirm(selectedSlot, hasNamedSpots ? selectedSpot : null, name, rut);
     } catch (e: any) {
       setConfirmError(e.message || 'Error al confirmar la reserva');
     } finally {
@@ -206,7 +209,7 @@ function BookingModal({
     }
   };
 
-  const STEPS: BookingStep[] = ['date', 'slot', 'spot'];
+  const STEPS: BookingStep[] = hasNamedSpots ? ['date', 'slot', 'spot'] : ['date', 'slot'];
   const stepIdx = STEPS.indexOf(step);
 
   const spotLabel = spotsData?.spot_label ?? booking.service.spotLabel;
@@ -223,6 +226,7 @@ function BookingModal({
               {step === 'slot' && 'Selecciona un horario'}
               {step === 'spot' && `Elige tu ${spotLabel ?? 'cupo'}`}
             </p>
+
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X className="h-5 w-5" />
@@ -421,16 +425,22 @@ function BookingModal({
             </button>
             <button
               disabled={
-                (step === 'slot' && !selectedSlot) ||
+                (step === 'slot' && (!selectedSlot || confirming)) ||
                 (step === 'spot' && (selectedSpot === null || confirming))
               }
               onClick={() => {
-                if (step === 'slot' && selectedSlot) setStep('spot');
-                else if (step === 'spot') handleConfirm();
+                if (step === 'slot' && selectedSlot) {
+                  if (hasNamedSpots) setStep('spot');
+                  else handleConfirm();
+                } else if (step === 'spot') {
+                  handleConfirm();
+                }
               }}
               className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {step === 'spot' ? (confirming ? 'Reservando...' : 'Confirmar reserva') : 'Siguiente'}
+              {(step === 'spot' || (step === 'slot' && !hasNamedSpots))
+                ? (confirming ? 'Reservando...' : 'Confirmar reserva')
+                : 'Siguiente'}
             </button>
           </div>
         )}
@@ -491,12 +501,20 @@ export default function CenterPage() {
 
   const handleConfirm = async (
     slot: Slot,
-    spotNumber: number,
+    spotNumber: number | null,
     customerName: string,
     customerRut: string,
   ) => {
     const token = getMemberToken();
     if (!token || !booking) throw new Error('No autenticado');
+
+    const body: Record<string, any> = {
+      service_id: booking.service.id,
+      slot_start: slot.slot_start,
+      customer_name: customerName,
+      customer_external_id: customerRut || undefined,
+    };
+    if (spotNumber !== null) body.spot_number = spotNumber;
 
     const res = await fetch(`${BASE}/members/reservations`, {
       method: 'POST',
@@ -504,13 +522,7 @@ export default function CenterPage() {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        service_id: booking.service.id,
-        slot_start: slot.slot_start,
-        spot_number: spotNumber,
-        customer_name: customerName,
-        customer_external_id: customerRut || undefined,
-      }),
+      body: JSON.stringify(body),
     });
     const json = await res.json();
     if (!res.ok) {
@@ -519,10 +531,12 @@ export default function CenterPage() {
     }
 
     const spotLabel = booking.service.spotLabel;
-    const spotStr = spotLabel ? `${spotLabel} ${spotNumber}` : `cupo #${spotNumber}`;
+    const spotStr = spotNumber !== null
+      ? (spotLabel ? `${spotLabel} ${spotNumber}` : `cupo #${spotNumber}`)
+      : '';
     setBooking(null);
     setSuccessMessage(
-      `Reserva confirmada: ${spotStr} el ${formatSlotDate(`${booking.date}T12:00:00`, booking.service.timezone)} a las ${formatSlotTime(slot.slot_start, booking.service.timezone)}`,
+      `Reserva confirmada${spotStr ? `: ${spotStr}` : ''} el ${formatSlotDate(`${booking.date}T12:00:00`, booking.service.timezone)} a las ${formatSlotTime(slot.slot_start, booking.service.timezone)}`,
     );
   };
 
