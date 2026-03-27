@@ -207,7 +207,7 @@ export default function SettingsPage() {
                 id="center_name"
                 {...registerCenter('center_name')}
                 className="mt-1"
-                placeholder="ej: Clases Particulares Jorge"
+                placeholder="ej: Centro Deportivo Norte"
               />
               {centerErrors.center_name && (
                 <p className="text-xs text-red-500 mt-1">{centerErrors.center_name.message}</p>

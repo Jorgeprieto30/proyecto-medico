@@ -116,9 +116,9 @@ function RegisterForm() {
             </div>
           )}
 
-          {field('first_name', 'Nombre', 'text', 'Jorge')}
-          {field('last_name', 'Apellido', 'text', 'Prieto')}
-          {field('email', 'Correo electrónico', 'email', 'jorge@example.com')}
+          {field('first_name', 'Nombre', 'text', 'María')}
+          {field('last_name', 'Apellido', 'text', 'González')}
+          {field('email', 'Correo electrónico', 'email', 'maria@example.com')}
           {field('rut', 'RUT', 'text', '12.345.678-9', false)}
           {field('birth_date', 'Fecha de nacimiento', 'date', '')}
           {field('password', 'Contraseña', 'password', '••••••••')}

@@ -13,15 +13,15 @@ export class Member {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ApiProperty({ example: 'Jorge' })
+  @ApiProperty({ example: 'María' })
   @Column({ name: 'first_name', length: 255 })
   first_name: string;
 
-  @ApiProperty({ example: 'Prieto' })
+  @ApiProperty({ example: 'González' })
   @Column({ name: 'last_name', length: 255 })
   last_name: string;
 
-  @ApiProperty({ example: 'jorge@example.com' })
+  @ApiProperty({ example: 'maria@example.com' })
   @Column({ unique: true })
   email: string;
 

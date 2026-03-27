@@ -14,7 +14,7 @@ export class CreateReservationDto {
   @IsNotEmpty()
   slot_start: string;
 
-  @ApiPropertyOptional({ example: 'Jorge Prieto' })
+  @ApiPropertyOptional({ example: 'María González' })
   @IsString()
   @IsOptional()
   customer_name?: string;

@@ -178,7 +178,7 @@ function MemberLoginForm({ redirect }: { redirect: string }) {
           {...register('email')}
           type="email"
           autoComplete="email"
-          placeholder="jorge@example.com"
+          placeholder="correo@example.com"
           className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
         />
         {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>}

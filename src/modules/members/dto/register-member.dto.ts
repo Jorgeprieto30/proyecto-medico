@@ -8,17 +8,17 @@ import {
 } from 'class-validator';
 
 export class RegisterMemberDto {
-  @ApiProperty({ example: 'Jorge' })
+  @ApiProperty({ example: 'María' })
   @IsString()
   @MinLength(1)
   first_name: string;
 
-  @ApiProperty({ example: 'Prieto' })
+  @ApiProperty({ example: 'González' })
   @IsString()
   @MinLength(1)
   last_name: string;
 
-  @ApiProperty({ example: 'jorge@example.com' })
+  @ApiProperty({ example: 'maria@example.com' })
   @IsEmail()
   email: string;
 

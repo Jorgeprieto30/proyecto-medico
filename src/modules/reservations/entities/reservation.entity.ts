@@ -50,7 +50,7 @@ export class Reservation {
   })
   status: ReservationStatus;
 
-  @ApiPropertyOptional({ example: 'Jorge Prieto', nullable: true })
+  @ApiPropertyOptional({ example: 'María González', nullable: true })
   @Column({ name: 'customer_name', type: 'varchar', nullable: true, length: 255 })
   customerName: string | null;
 
