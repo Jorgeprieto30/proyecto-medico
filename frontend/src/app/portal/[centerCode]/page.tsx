@@ -196,8 +196,7 @@ function BookingModal({ booking, onClose, onConfirm, memberProfile }: {
     setConfirming(true); setConfirmError('');
     try {
       const name = memberProfile ? `${memberProfile.first_name} ${memberProfile.last_name}` : '';
-      const rut  = memberProfile?.rut ?? '';
-      const result = await onConfirm(selectedSlot, hasNamedSpots ? selectedSpot : null, name, rut);
+      const result = await onConfirm(selectedSlot, hasNamedSpots ? selectedSpot : null, name, '');
       setConfirmed(result); setStep('success');
     } catch (e: any) {
       if (e.message === 'DUPLICATE_BOOKING') {

@@ -20,10 +20,16 @@ async function bootstrap() {
     .filter(Boolean);
 
   if (allowedOrigins.length === 0) {
-    // Sin FRONTEND_URLS configurado: modo abierto con advertencia
-    console.warn(
-      '⚠️  FRONTEND_URLS no configurado — CORS abierto. Define FRONTEND_URLS=https://tu-frontend.com en producción.',
-    );
+    if (process.env.NODE_ENV === 'production') {
+      console.error(
+        '🚨 SEGURIDAD: FRONTEND_URLS no configurado en producción — CORS abierto. ' +
+        'Agrega FRONTEND_URLS=https://tu-frontend.com en las variables de entorno de Railway.',
+      );
+    } else {
+      console.warn(
+        '⚠️  FRONTEND_URLS no configurado — CORS abierto. Define FRONTEND_URLS=https://tu-frontend.com en producción.',
+      );
+    }
     app.enableCors({ credentials: true });
   } else {
     app.enableCors({

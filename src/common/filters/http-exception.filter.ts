@@ -38,7 +38,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
         `Unhandled exception: ${exception.message}`,
         exception.stack,
       );
-      message = exception.message;
+      // Never leak internal error details in production
+      message = process.env.NODE_ENV === 'production'
+        ? 'Internal server error'
+        : exception.message;
     }
 
     response.status(status).json({

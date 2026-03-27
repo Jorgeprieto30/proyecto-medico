@@ -69,6 +69,7 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Obtener usuario autenticado' })
   me(@Request() req: any) {
-    return req.user;
+    const { id, email, name, avatar_url, center_code, created_at } = req.user;
+    return { id, email, name, avatar_url, center_code, created_at };
   }
 }

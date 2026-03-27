@@ -1,5 +1,6 @@
-import { Controller, Get, NotFoundException, Param, Query } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../auth/decorators/public.decorator';
 import { UsersService } from '../users/users.service';
 import { ServicesService } from '../services/services.service';
@@ -7,6 +8,7 @@ import { AvailabilityService } from '../availability/availability.service';
 
 @ApiTags('public')
 @Public()
+@Throttle({ default: { ttl: 60_000, limit: 20 } })
 @Controller('public')
 export class PublicController {
   constructor(
@@ -19,6 +21,9 @@ export class PublicController {
   @ApiOperation({ summary: 'Buscar centros por nombre o código' })
   @ApiQuery({ name: 'q', type: String, required: false })
   async searchCenters(@Query('q') q: string = '') {
+    if (q && q.length < 2) {
+      throw new BadRequestException('El parámetro de búsqueda debe tener al menos 2 caracteres');
+    }
     return this.usersService.searchCenters(q);
   }
 
@@ -36,7 +41,7 @@ export class PublicController {
   @ApiQuery({ name: 'service_id', type: String })
   @ApiQuery({ name: 'date', type: String })
   async getAvailability(
-    @Query('service_id') serviceId: string,
+    @Query('service_id', ParseUUIDPipe) serviceId: string,
     @Query('date') date: string,
   ) {
     return this.availabilityService.getAvailabilityByDate(serviceId, date);
@@ -47,7 +52,7 @@ export class PublicController {
   @ApiQuery({ name: 'service_id', type: String })
   @ApiQuery({ name: 'slot_start', type: String, example: '2026-03-20T14:00:00.000Z' })
   async getSpots(
-    @Query('service_id') serviceId: string,
+    @Query('service_id', ParseUUIDPipe) serviceId: string,
     @Query('slot_start') slotStart: string,
   ) {
     return this.availabilityService.getSpotsForSlot(serviceId, slotStart);

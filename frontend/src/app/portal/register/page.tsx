@@ -36,7 +36,7 @@ function RegisterForm() {
     if (!form.email.includes('@')) errs.email = 'Email inválido';
     if (form.rut && !validateRut(form.rut)) errs.rut = 'RUT inválido (ej: 12.345.678-9)';
     if (!form.birth_date) errs.birth_date = 'Fecha de nacimiento requerida';
-    if (form.password.length < 6) errs.password = 'Mínimo 6 caracteres';
+    if (form.password.length < 8) errs.password = 'Mínimo 8 caracteres';
     if (form.password !== form.confirmPassword) errs.confirmPassword = 'Las contraseñas no coinciden';
     return errs;
   };

@@ -37,14 +37,28 @@ export default function PerfilPage() {
       return;
     }
     setToken(t);
-    const profile = getMemberProfile();
-    if (profile) {
-      setFirstName(profile.first_name);
-      setLastName(profile.last_name);
-      setRut(profile.rut ?? '');
-      setBirthDate(profile.birth_date ?? '');
-      setEmail(profile.email);
+    // Load basic display info from localStorage (non-sensitive)
+    const cached = getMemberProfile();
+    if (cached) {
+      setFirstName(cached.first_name);
+      setLastName(cached.last_name);
+      setEmail(cached.email);
     }
+    // Fetch full profile from API to get rut and birth_date (not stored in localStorage)
+    fetch(`${BASE}/members/me`, {
+      headers: { Authorization: `Bearer ${t}` },
+    })
+      .then((res) => res.ok ? res.json() : null)
+      .then((json) => {
+        if (!json) return;
+        const member = json.data ?? json;
+        setFirstName(member.first_name ?? '');
+        setLastName(member.last_name ?? '');
+        setEmail(member.email ?? '');
+        setRut(member.rut ?? '');
+        setBirthDate(member.birth_date ?? '');
+      })
+      .catch(() => {/* silently ignore — cached values are shown */});
   }, [router]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -78,14 +92,7 @@ export default function PerfilPage() {
         return;
       }
       const member = json.data ?? json;
-      updateMemberProfile({
-        id: member.id,
-        first_name: member.first_name,
-        last_name: member.last_name,
-        email: member.email,
-        rut: member.rut,
-        birth_date: member.birth_date ?? null,
-      });
+      updateMemberProfile(member);
       setProfileSuccess('Perfil actualizado correctamente.');
     } catch {
       setProfileError('Error de conexión. Intenta nuevamente.');
@@ -97,8 +104,8 @@ export default function PerfilPage() {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
-    if (newPassword.length < 6) {
-      setPasswordError('La nueva contraseña debe tener al menos 6 caracteres.');
+    if (newPassword.length < 8) {
+      setPasswordError('La nueva contraseña debe tener al menos 8 caracteres.');
       return;
     }
     if (newPassword !== confirmNewPassword) {
@@ -247,7 +254,7 @@ export default function PerfilPage() {
               onChange={(e) => setNewPassword(e.target.value)}
               required
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Mínimo 6 caracteres"
+              placeholder="Mínimo 8 caracteres"
             />
           </div>
           <div>
