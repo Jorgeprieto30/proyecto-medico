@@ -131,11 +131,14 @@ function GeneralTab({
   const namedSpots = watch('namedSpots');
 
   const saveMutation = useMutation({
-    mutationFn: (data: GeneralForm) =>
-      servicesApi.update(serviceId, {
-        ...data,
-        spotLabel: data.namedSpots ? (data.spotLabel || undefined) : undefined,
-      }),
+    mutationFn: (data: GeneralForm) => {
+      // namedSpots is UI-only — strip it before sending to the API
+      const { namedSpots, spotLabel, ...rest } = data;
+      return servicesApi.update(serviceId, {
+        ...rest,
+        spotLabel: namedSpots ? (spotLabel || undefined) : undefined,
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['services'] });
       qc.invalidateQueries({ queryKey: ['services', serviceId] });
