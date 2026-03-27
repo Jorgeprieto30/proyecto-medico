@@ -16,6 +16,7 @@ export default function PerfilPage() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName]   = useState('');
   const [rut, setRut]             = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [email, setEmail]         = useState('');
   const [profileError, setProfileError] = useState('');
   const [profileSuccess, setProfileSuccess] = useState('');
@@ -41,6 +42,7 @@ export default function PerfilPage() {
       setFirstName(profile.first_name);
       setLastName(profile.last_name);
       setRut(profile.rut ?? '');
+      setBirthDate(profile.birth_date ?? '');
       setEmail(profile.email);
     }
   }, [router]);
@@ -63,6 +65,7 @@ export default function PerfilPage() {
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           rut: rut.trim() || undefined,
+          birth_date: birthDate || undefined,
         }),
       });
       const json = await res.json();
@@ -81,6 +84,7 @@ export default function PerfilPage() {
         last_name: member.last_name,
         email: member.email,
         rut: member.rut,
+        birth_date: member.birth_date ?? null,
       });
       setProfileSuccess('Perfil actualizado correctamente.');
     } catch {
@@ -188,6 +192,17 @@ export default function PerfilPage() {
               value={rut}
               onChange={(e) => setRut(e.target.value)}
               placeholder="12.345.678-9"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Fecha de nacimiento <span className="text-gray-400 font-normal">(opcional)</span>
+            </label>
+            <input
+              type="date"
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>

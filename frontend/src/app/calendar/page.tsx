@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ChevronLeft, ChevronRight, Info, UserPlus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Info, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { servicesApi, availabilityApi, reservationsApi } from '@/lib/api';
@@ -805,9 +805,68 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
 
       {/* Registered people */}
       <div>
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">
-          Personas inscritas{slotReservations.length > 0 ? ` (${slotReservations.length})` : ''}
-        </h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-semibold text-gray-700">
+            Personas inscritas{slotReservations.length > 0 ? ` (${slotReservations.length})` : ''}
+          </h3>
+          {slotReservations.length > 0 && (
+            <button
+              onClick={() => {
+                const dateStr = new Date(slot.slot_start).toLocaleDateString('es-CL', {
+                  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                  timeZone: slot.timezone,
+                });
+                const startTime = formatHHMM(slot.slot_start, slot.timezone);
+                const endTime   = formatHHMM(slot.slot_end, slot.timezone);
+                const rows = slotReservations
+                  .slice()
+                  .sort((a, b) => (a.spotNumber ?? 0) - (b.spotNumber ?? 0))
+                  .map((r) => `
+                    <tr>
+                      <td>${r.spotNumber ?? '—'}</td>
+                      <td>${r.customerName ?? '—'}</td>
+                      <td>${r.customerExternalId ?? '—'}</td>
+                      <td>${r.status === 'confirmed' ? 'Confirmado' : 'Pendiente'}</td>
+                    </tr>`).join('');
+                const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+                  <title>Asistentes - ${slot.serviceName}</title>
+                  <style>
+                    body { font-family: Arial, sans-serif; padding: 32px; color: #111; }
+                    h1 { font-size: 20px; margin-bottom: 4px; }
+                    .meta { font-size: 14px; color: #555; margin-bottom: 24px; }
+                    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+                    th { background: #f3f4f6; padding: 8px 12px; text-align: left; border-bottom: 2px solid #e5e7eb; }
+                    td { padding: 7px 12px; border-bottom: 1px solid #e5e7eb; }
+                    tr:last-child td { border-bottom: none; }
+                    @media print { body { padding: 16px; } }
+                  </style>
+                </head><body>
+                  <h1>${slot.serviceName}</h1>
+                  <div class="meta">
+                    <span>Fecha: ${dateStr}</span> &nbsp;·&nbsp;
+                    <span>Horario: ${startTime} – ${endTime}</span> &nbsp;·&nbsp;
+                    <span>Asistentes: ${slotReservations.length} / ${slot.capacity}</span>
+                  </div>
+                  <table>
+                    <thead><tr>
+                      <th>${spotLabel ?? 'Cupo'}</th>
+                      <th>Nombre</th>
+                      <th>RUT</th>
+                      <th>Estado</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                  </table>
+                </body></html>`;
+                const win = window.open('', '_blank');
+                if (win) { win.document.write(html); win.document.close(); win.print(); }
+              }}
+              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Descargar PDF
+            </button>
+          )}
+        </div>
         {loadingRes ? (
           <p className="text-xs text-gray-400 py-2">Cargando...</p>
         ) : slotReservations.length === 0 ? (

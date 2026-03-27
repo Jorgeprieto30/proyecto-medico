@@ -29,6 +29,10 @@ export class Member {
   @Column({ type: 'varchar', length: 20, nullable: true })
   rut: string | null;
 
+  @ApiPropertyOptional({ example: '1990-05-20', nullable: true })
+  @Column({ name: 'birth_date', type: 'date', nullable: true })
+  birth_date: string | null;
+
   @Column({ name: 'password_hash', nullable: true, select: false })
   password_hash: string;
 

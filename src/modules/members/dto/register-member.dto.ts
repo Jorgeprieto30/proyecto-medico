@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsDateString,
   IsEmail,
   IsOptional,
   IsString,
@@ -25,6 +26,11 @@ export class RegisterMemberDto {
   @IsOptional()
   @IsString()
   rut?: string;
+
+  @ApiPropertyOptional({ example: '1990-05-20' })
+  @IsOptional()
+  @IsDateString()
+  birth_date?: string;
 
   @ApiProperty({ example: 'password123', minLength: 6 })
   @IsString()

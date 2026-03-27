@@ -18,6 +18,7 @@ function RegisterForm() {
     last_name: '',
     email: '',
     rut: '',
+    birth_date: '',
     password: '',
     confirmPassword: '',
   });
@@ -34,6 +35,7 @@ function RegisterForm() {
     if (!form.last_name.trim()) errs.last_name = 'Apellido requerido';
     if (!form.email.includes('@')) errs.email = 'Email inválido';
     if (form.rut && !validateRut(form.rut)) errs.rut = 'RUT inválido (ej: 12.345.678-9)';
+    if (!form.birth_date) errs.birth_date = 'Fecha de nacimiento requerida';
     if (form.password.length < 6) errs.password = 'Mínimo 6 caracteres';
     if (form.password !== form.confirmPassword) errs.confirmPassword = 'Las contraseñas no coinciden';
     return errs;
@@ -56,6 +58,7 @@ function RegisterForm() {
         last_name: form.last_name.trim(),
         email: form.email.trim(),
         password: form.password,
+        birth_date: form.birth_date,
       };
       if (form.rut.trim()) body.rut = form.rut.trim();
 
@@ -117,6 +120,7 @@ function RegisterForm() {
           {field('last_name', 'Apellido', 'text', 'Prieto')}
           {field('email', 'Correo electrónico', 'email', 'jorge@example.com')}
           {field('rut', 'RUT', 'text', '12.345.678-9', false)}
+          {field('birth_date', 'Fecha de nacimiento', 'date', '')}
           {field('password', 'Contraseña', 'password', '••••••••')}
 
           <div>

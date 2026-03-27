@@ -7,6 +7,7 @@ export interface MemberProfile {
   last_name: string;
   email: string;
   rut: string | null;
+  birth_date: string | null;
 }
 
 export function memberLogin(token: string, profile: MemberProfile): void {
