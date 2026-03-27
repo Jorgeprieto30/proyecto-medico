@@ -2,24 +2,38 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { getMemberProfile, memberLogout, type MemberProfile } from '@/lib/member-auth';
-import { useRouter } from 'next/navigation';
+import { getMemberProfile, getMemberToken, memberLogout, type MemberProfile } from '@/lib/member-auth';
+import { useRouter, usePathname } from 'next/navigation';
+
+// Routes that don't require authentication
+const PUBLIC_PATHS = ['/portal', '/portal/login', '/portal/register'];
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [profile, setProfile] = useState<MemberProfile | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    const token = getMemberToken();
+    const isPublic = PUBLIC_PATHS.includes(pathname);
+    if (!token && !isPublic) {
+      router.replace(`/portal/login?redirect=${encodeURIComponent(pathname)}`);
+      return;
+    }
     setProfile(getMemberProfile());
     setMounted(true);
-  }, []);
+  }, [pathname, router]);
 
   const handleLogout = () => {
     memberLogout();
     setProfile(null);
     router.push('/portal');
   };
+
+  // Don't render protected content until auth is confirmed
+  const isPublic = PUBLIC_PATHS.includes(pathname);
+  if (!mounted && !isPublic) return null;
 
   return (
     <div className="min-h-screen bg-white">
