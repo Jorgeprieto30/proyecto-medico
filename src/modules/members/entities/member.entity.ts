@@ -33,7 +33,7 @@ export class Member {
   @Column({ name: 'birth_date', type: 'date', nullable: true })
   birth_date: string | null;
 
-  @Column({ name: 'password_hash', nullable: true, select: false })
+  @Column({ name: 'password_hash', type: 'varchar', nullable: true, select: false })
   password_hash: string | null;
 
   @Column({ name: 'reset_password_token', type: 'varchar', length: 64, nullable: true, select: false })
