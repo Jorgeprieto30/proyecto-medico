@@ -332,8 +332,8 @@ export default function EventosPage() {
                           className="mt-0.5"
                         />
                         <div>
-                          <p className="text-sm font-medium text-gray-700">Día anterior</p>
-                          <p className="text-xs text-gray-400">Cierra el día anterior a las 00:01</p>
+                          <p className="text-sm font-medium text-gray-700">Días antes</p>
+                          <p className="text-xs text-gray-400">Cierra N días antes a las 00:01</p>
                         </div>
                       </label>
                     </div>
