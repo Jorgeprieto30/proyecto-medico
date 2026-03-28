@@ -8,6 +8,41 @@ import { useRouter, usePathname } from 'next/navigation';
 // Routes that don't require authentication
 const PUBLIC_PATHS = ['/portal/login', '/portal/register'];
 
+function CampusHeaderLogo() {
+  return (
+    <div className="flex items-center gap-2.5">
+      {/* Mini calendar icon */}
+      <div className="relative w-9 h-9">
+        <div className="absolute bottom-0 right-0 w-7 h-7 rounded-lg bg-blue-200/60" />
+        <div className="absolute top-0 left-0 w-7 h-7 bg-white rounded-lg shadow-md flex flex-col items-center justify-center gap-1">
+          <div className="flex gap-1 -mt-0.5">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="w-[3px] h-[5px] bg-blue-400 rounded-full" />
+            ))}
+          </div>
+          <div className="grid grid-cols-3 gap-[2px]">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="w-[4px] h-[4px] bg-gray-200 rounded-sm" />
+            ))}
+          </div>
+        </div>
+      </div>
+      {/* Brand text */}
+      <span
+        className="text-xl font-bold tracking-tight"
+        style={{
+          background: 'linear-gradient(90deg, #5ba3d9 0%, #6dbfb0 50%, #b8a898 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+        }}
+      >
+        campus
+      </span>
+    </div>
+  );
+}
+
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -39,9 +74,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     <div className="min-h-screen bg-white">
       <header className="border-b bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/portal" className="flex items-center gap-2">
-            <span className="text-xl font-bold text-blue-600">campus</span>
-            <span className="text-sm text-gray-500 hidden sm:inline">Portal de Reservas</span>
+          <Link href="/portal" className="flex items-center">
+            <CampusHeaderLogo />
           </Link>
           <nav className="flex items-center gap-3">
             {mounted && profile ? (
