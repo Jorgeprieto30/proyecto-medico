@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -53,6 +53,7 @@ const createSchema = z.object({
   bookingCutoffMode:    z.enum(['hours', 'day_before']),
   bookingCutoffHours:   z.coerce.number().min(0).max(168),
   bookingCutoffDays:    z.coerce.number().min(1).max(30),
+  uniqueEvent:         z.boolean(),
   days:                z.array(z.number()).min(1, 'Selecciona al menos un día'),
   timeSlots: z.array(timeSlotSchema).min(1, 'Agrega al menos un horario'),
   validFrom:           z.string().optional(),
@@ -64,6 +65,7 @@ const DEFAULT_CREATE: CreateForm = {
   name: '', description: '', timezone: 'America/Santiago',
   slotDurationMinutes: 60, maxSpots: 20, namedSpots: false, spotLabel: '',
   bookingCutoffEnabled: false, bookingCutoffMode: 'hours', bookingCutoffHours: 24, bookingCutoffDays: 1,
+  uniqueEvent: false,
   days: [],
   timeSlots: [{ startTime: '08:00', endTime: '09:00' }],
   validFrom: todayAsString(), validUntil: '',
@@ -85,7 +87,7 @@ export default function EventosPage() {
   });
 
   const {
-    register, handleSubmit, reset, control, watch,
+    register, handleSubmit, reset, control, watch, setValue,
     formState: { errors },
   } = useForm<CreateForm>({
     resolver: zodResolver(createSchema),
@@ -100,6 +102,17 @@ export default function EventosPage() {
   const namedSpots = watch('namedSpots');
   const cutoffEnabled = watch('bookingCutoffEnabled');
   const cutoffMode = watch('bookingCutoffMode');
+  const uniqueEvent = watch('uniqueEvent');
+  const validFrom = watch('validFrom');
+
+  // When uniqueEvent is on, auto-derive day of week from validFrom
+  useEffect(() => {
+    if (!uniqueEvent || !validFrom) return;
+    const d = new Date(validFrom + 'T12:00:00');
+    const jsDay = d.getDay(); // 0=Sun..6=Sat
+    const isoDay = jsDay === 0 ? 7 : jsDay;
+    setValue('days', [isoDay]);
+  }, [uniqueEvent, validFrom, setValue]);
 
   const openCreate = () => { reset(DEFAULT_CREATE); setCreateOpen(true); };
 
@@ -117,11 +130,12 @@ export default function EventosPage() {
         bookingCutoffHours: data.bookingCutoffMode === 'hours' ? data.bookingCutoffHours : 24,
         bookingCutoffDays: data.bookingCutoffMode === 'day_before' ? data.bookingCutoffDays : 1,
       });
+      const validUntil = data.uniqueEvent ? data.validFrom : (data.validUntil || undefined);
       for (const day of data.days) {
         for (const slot of data.timeSlots) {
           await rulesApi.create(svc.id, {
             dayOfWeek: day, startTime: slot.startTime, endTime: slot.endTime,
-            validFrom: data.validFrom || undefined, validUntil: data.validUntil || undefined,
+            validFrom: data.validFrom || undefined, validUntil,
           });
         }
       }
@@ -366,31 +380,33 @@ export default function EventosPage() {
           <hr className="border-gray-100" />
 
           {/* Days */}
-          <div>
-            <Label>Días de la semana *</Label>
-            <Controller
-              name="days" control={control}
-              render={({ field }) => (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {DAY_OPTIONS.map((day) => {
-                    const checked = field.value.includes(day);
-                    return (
-                      <button
-                        key={day} type="button"
-                        onClick={() => field.onChange(checked ? field.value.filter((d) => d !== day) : [...field.value, day])}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                          checked ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                        }`}
-                      >
-                        {DAY_NAMES[day]}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            />
-            {errors.days && <p className="text-xs text-red-500 mt-1">{errors.days.message as string}</p>}
-          </div>
+          {!uniqueEvent && (
+            <div>
+              <Label>Días de la semana *</Label>
+              <Controller
+                name="days" control={control}
+                render={({ field }) => (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {DAY_OPTIONS.map((day) => {
+                      const checked = field.value.includes(day);
+                      return (
+                        <button
+                          key={day} type="button"
+                          onClick={() => field.onChange(checked ? field.value.filter((d) => d !== day) : [...field.value, day])}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                            checked ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                          }`}
+                        >
+                          {DAY_NAMES[day]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              />
+              {errors.days && <p className="text-xs text-red-500 mt-1">{errors.days.message as string}</p>}
+            </div>
+          )}
 
           {/* Time slots */}
           <div>
@@ -430,16 +446,38 @@ export default function EventosPage() {
           </div>
 
           {/* Date range */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Fecha de inicio</Label>
-              <Input type="date" {...register('validFrom')} className="mt-1" />
-              <p className="text-xs text-gray-400 mt-0.5">Desde cuándo aplica el horario</p>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Controller
+                name="uniqueEvent"
+                control={control}
+                render={({ field }) => (
+                  <input
+                    type="checkbox"
+                    id="uniqueEvent"
+                    checked={field.value}
+                    onChange={(e) => field.onChange(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                )}
+              />
+              <label htmlFor="uniqueEvent" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
+                Evento único (ocurre solo una vez)
+              </label>
             </div>
-            <div>
-              <Label>Fecha de fin (opcional)</Label>
-              <Input type="date" {...register('validUntil')} className="mt-1" />
-              <p className="text-xs text-gray-400 mt-0.5">Vacío = sin fecha límite</p>
+            <div className={`grid gap-4 ${uniqueEvent ? 'grid-cols-1' : 'grid-cols-2'}`}>
+              <div>
+                <Label>{uniqueEvent ? 'Fecha del evento' : 'Fecha de inicio'}</Label>
+                <Input type="date" {...register('validFrom')} className="mt-1" />
+                {!uniqueEvent && <p className="text-xs text-gray-400 mt-0.5">Desde cuándo aplica el horario</p>}
+              </div>
+              {!uniqueEvent && (
+                <div>
+                  <Label>Fecha de fin (opcional)</Label>
+                  <Input type="date" {...register('validUntil')} className="mt-1" />
+                  <p className="text-xs text-gray-400 mt-0.5">Vacío = sin fecha límite</p>
+                </div>
+              )}
             </div>
           </div>
 
