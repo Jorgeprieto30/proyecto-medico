@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { servicesApi, availabilityApi, reservationsApi } from '@/lib/api';
 import type { Service } from '@/types';
 import type { SlotAvailability } from '@/types';
-import { todayAsString, validateRut } from '@/lib/utils';
+import { todayAsString, validateRut, normalizeRut } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -686,7 +686,7 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
         slot_start: slot.slot_start,
         spot_number: data.spot_number,
         customer_name: data.customer_name,
-        customer_external_id: data.customer_external_id || undefined,
+        customer_external_id: data.customer_external_id ? normalizeRut(data.customer_external_id) : undefined,
         metadata: data.customer_email ? { email: data.customer_email } : undefined,
       }),
     onSuccess: () => {
@@ -825,7 +825,7 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
                     <tr>
                       <td>${r.spotNumber ?? '—'}</td>
                       <td>${r.customerName ?? '—'}</td>
-                      <td>${r.customerExternalId ?? '—'}</td>
+                      <td>${r.customerExternalId ? normalizeRut(r.customerExternalId) : '—'}</td>
                       <td>${r.status === 'confirmed' ? 'Confirmado' : 'Pendiente'}</td>
                     </tr>`).join('');
                 const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
@@ -893,7 +893,7 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
                       {r.spotNumber ?? '—'}
                     </td>
                     <td className="px-3 py-2 text-gray-800">{r.customerName ?? '—'}</td>
-                    <td className="px-3 py-2 font-mono text-gray-500">{r.customerExternalId ?? '—'}</td>
+                    <td className="px-3 py-2 font-mono text-gray-500">{r.customerExternalId ? normalizeRut(r.customerExternalId) : '—'}</td>
                     <td className="px-3 py-2">
                       <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${
                         r.status === 'confirmed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
