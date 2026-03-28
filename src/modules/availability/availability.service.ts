@@ -87,19 +87,21 @@ export class AvailabilityService {
     );
 
     const now = DateTime.now().toUTC();
-    return slots.map((slot) => {
-      const key = slot.slotStart.toISO()!;
-      const reserved = reservationCounts[key] ?? 0;
-      const available = Math.max(0, slot.capacity - reserved);
-      return {
-        slot_start: slot.slotStart.toISO()!,
-        slot_end: slot.slotEnd.toISO()!,
-        capacity: slot.capacity,
-        reserved,
-        available,
-        bookable: available > 0 && isWithinBookingWindow(service, slot.slotStart, now),
-      };
-    });
+    return slots
+      .filter((slot) => slot.slotStart.toUTC() > now)
+      .map((slot) => {
+        const key = slot.slotStart.toISO()!;
+        const reserved = reservationCounts[key] ?? 0;
+        const available = Math.max(0, slot.capacity - reserved);
+        return {
+          slot_start: slot.slotStart.toISO()!,
+          slot_end: slot.slotEnd.toISO()!,
+          capacity: slot.capacity,
+          reserved,
+          available,
+          bookable: available > 0 && isWithinBookingWindow(service, slot.slotStart, now),
+        };
+      });
   }
 
   async getAvailabilityBySlot(
