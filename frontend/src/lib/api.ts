@@ -131,9 +131,9 @@ export const exceptionsApi = {
 
 // ─── Availability ─────────────────────────────────────────────────────────────
 export const availabilityApi = {
-  byDate: (serviceId: string, date: string) =>
+  byDate: (serviceId: string, date: string, includePast = false) =>
     request<SlotAvailability[]>(
-      `/availability?service_id=${serviceId}&date=${date}`,
+      `/availability?service_id=${serviceId}&date=${date}${includePast ? '&include_past=true' : ''}`,
     ),
   bySlot: (serviceId: string, datetime: string) =>
     request<SlotDetail>(

@@ -64,6 +64,7 @@ export class AvailabilityService {
   async getAvailabilityByDate(
     serviceId: string,
     date: string,
+    includePast = false,
   ): Promise<SlotAvailabilityDto[]> {
     const service = await this.servicesService.findOne(serviceId);
 
@@ -88,7 +89,7 @@ export class AvailabilityService {
 
     const now = DateTime.now().toUTC();
     return slots
-      .filter((slot) => slot.slotStart.toUTC() > now)
+      .filter((slot) => includePast || slot.slotStart.toUTC() > now)
       .map((slot) => {
         const key = slot.slotStart.toISO()!;
         const reserved = reservationCounts[key] ?? 0;

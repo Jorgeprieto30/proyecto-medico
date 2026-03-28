@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, ParseBoolPipe, DefaultValuePipe } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
 import { AvailabilityService } from './availability.service';
@@ -13,12 +13,14 @@ export class AvailabilityController {
   @ApiOperation({ summary: 'Consultar disponibilidad por fecha' })
   @ApiQuery({ name: 'service_id', type: String })
   @ApiQuery({ name: 'date', type: String, example: '2026-03-20' })
+  @ApiQuery({ name: 'include_past', type: Boolean, required: false, description: 'Incluir slots pasados (solo para admin)' })
   @ApiResponse({ status: 200, type: [SlotAvailabilityDto] })
   getByDate(
     @Query('service_id') serviceId: string,
     @Query('date') date: string,
+    @Query('include_past', new DefaultValuePipe(false), ParseBoolPipe) includePast: boolean,
   ): Promise<SlotAvailabilityDto[]> {
-    return this.availabilityService.getAvailabilityByDate(serviceId, date);
+    return this.availabilityService.getAvailabilityByDate(serviceId, date, includePast);
   }
 
   @Get('slot')

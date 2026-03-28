@@ -207,7 +207,7 @@ export default function CalendarPage() {
             servicesToFetch.map(async (svc, svcIdx) => {
               const colorIdx = activeServices.findIndex((s) => s.id === svc.id) % COLORS.length;
               try {
-                const slots = await availabilityApi.byDate(svc.id, d);
+                const slots = await availabilityApi.byDate(svc.id, d, true);
                 slots.forEach((slot) => {
                   const startMin = minutesSinceStart(slot.slot_start, svc.timezone);
                   const endMin   = minutesSinceStart(slot.slot_end, svc.timezone);
