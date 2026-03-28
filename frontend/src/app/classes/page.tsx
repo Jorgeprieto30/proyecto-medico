@@ -462,7 +462,7 @@ export default function EventosPage() {
                 )}
               />
               <label htmlFor="uniqueEvent" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
-                Evento único (ocurre solo una vez)
+                Evento único
               </label>
             </div>
             <div className={`grid gap-4 ${uniqueEvent ? 'grid-cols-1' : 'grid-cols-2'}`}>
