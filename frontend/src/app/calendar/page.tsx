@@ -199,35 +199,44 @@ export default function CalendarPage() {
         ? activeServices.filter((s) => s.id === filterServiceId)
         : activeServices;
 
-      const results: Record<string, CalendarSlot[]> = {};
-      await Promise.all(
-        datesToFetch.map(async (d) => {
-          const daySlots: CalendarSlot[] = [];
-          await Promise.all(
-            servicesToFetch.map(async (svc, svcIdx) => {
-              const colorIdx = activeServices.findIndex((s) => s.id === svc.id) % COLORS.length;
-              try {
-                const slots = await availabilityApi.byDate(svc.id, d, true);
-                slots.forEach((slot) => {
-                  const startMin = minutesSinceStart(slot.slot_start, svc.timezone);
-                  const endMin   = minutesSinceStart(slot.slot_end, svc.timezone);
-                  if (startMin < 0 || endMin > (DAY_END_HOUR - DAY_START_HOUR) * 60) return;
-                  daySlots.push({
-                    ...slot,
-                    serviceId: svc.id,
-                    serviceName: svc.name,
-                    timezone: svc.timezone,
-                    colorIdx,
-                    topPx: (startMin / 60) * HOUR_HEIGHT_PX,
-                    heightPx: Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT_PX, 28),
-                  });
-                });
-              } catch { /* ignore */ }
-            }),
-          );
-          results[d] = daySlots;
+      const startDate = datesToFetch[0];
+      const endDate = datesToFetch[datesToFetch.length - 1];
+
+      // 1 request per service (instead of 7 × N)
+      const allRanges = await Promise.all(
+        servicesToFetch.map(async (svc) => {
+          const colorIdx = activeServices.findIndex((s) => s.id === svc.id) % COLORS.length;
+          try {
+            const rangeData = await availabilityApi.byRange(svc.id, startDate, endDate, true);
+            return { svc, colorIdx, rangeData };
+          } catch {
+            return { svc, colorIdx, rangeData: {} as Record<string, SlotAvailability[]> };
+          }
         }),
       );
+
+      const results: Record<string, CalendarSlot[]> = {};
+      for (const d of datesToFetch) {
+        const daySlots: CalendarSlot[] = [];
+        for (const { svc, colorIdx, rangeData } of allRanges) {
+          const slots = (rangeData as Record<string, any[]>)[d] ?? [];
+          for (const slot of slots) {
+            const startMin = minutesSinceStart(slot.slot_start, svc.timezone);
+            const endMin   = minutesSinceStart(slot.slot_end, svc.timezone);
+            if (startMin < 0 || endMin > (DAY_END_HOUR - DAY_START_HOUR) * 60) continue;
+            daySlots.push({
+              ...slot,
+              serviceId: svc.id,
+              serviceName: svc.name,
+              timezone: svc.timezone,
+              colorIdx,
+              topPx: (startMin / 60) * HOUR_HEIGHT_PX,
+              heightPx: Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT_PX, 28),
+            });
+          }
+        }
+        results[d] = daySlots;
+      }
       return results;
     },
     enabled: activeServices.length > 0 && datesToFetch.length > 0,

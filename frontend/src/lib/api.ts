@@ -135,6 +135,10 @@ export const availabilityApi = {
     request<SlotAvailability[]>(
       `/availability?service_id=${serviceId}&date=${date}${includePast ? '&include_past=true' : ''}`,
     ),
+  byRange: (serviceId: string, startDate: string, endDate: string, includePast = false) =>
+    request<Record<string, SlotAvailability[]>>(
+      `/availability/range?service_id=${serviceId}&start_date=${startDate}&end_date=${endDate}${includePast ? '&include_past=true' : ''}`,
+    ),
   bySlot: (serviceId: string, datetime: string) =>
     request<SlotDetail>(
       `/availability/slot?service_id=${serviceId}&datetime=${encodeURIComponent(datetime)}`,

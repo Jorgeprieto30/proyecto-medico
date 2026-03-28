@@ -105,6 +105,70 @@ export class AvailabilityService {
       });
   }
 
+  /**
+   * Devuelve disponibilidad para un rango de fechas en una sola llamada.
+   * Reduce de 7 requests (uno por día) a 1 por servicio en vista semanal.
+   */
+  async getAvailabilityByDateRange(
+    serviceId: string,
+    startDate: string,
+    endDate: string,
+    includePast = false,
+  ): Promise<Record<string, SlotAvailabilityDto[]>> {
+    const service = await this.servicesService.findOne(serviceId);
+
+    // Generar lista de fechas
+    const dates: string[] = [];
+    let cursor = DateTime.fromISO(startDate);
+    const end = DateTime.fromISO(endDate);
+    while (cursor <= end) {
+      dates.push(cursor.toISODate()!);
+      cursor = cursor.plus({ days: 1 });
+    }
+
+    // Generar slots para todas las fechas
+    const allSlotsByDate: Record<string, RawSlot[]> = {};
+    const allSlotStarts: DateTime[] = [];
+
+    await Promise.all(
+      dates.map(async (d) => {
+        const slots = await this.generateSlots(
+          serviceId, d, service.timezone,
+          service.slotDurationMinutes, service.maxSpots,
+        );
+        allSlotsByDate[d] = slots;
+        allSlotStarts.push(...slots.map((s) => s.slotStart));
+      }),
+    );
+
+    // Una sola query de reservas para TODOS los slots del rango
+    const reservationCounts = await this.getReservationCountsBySlots(serviceId, allSlotStarts);
+
+    const now = DateTime.now().toUTC();
+    const result: Record<string, SlotAvailabilityDto[]> = {};
+
+    for (const d of dates) {
+      const slots = allSlotsByDate[d] ?? [];
+      result[d] = slots
+        .filter((slot) => includePast || slot.slotStart.toUTC() > now)
+        .map((slot) => {
+          const key = slot.slotStart.toISO()!;
+          const reserved = reservationCounts[key] ?? 0;
+          const available = Math.max(0, slot.capacity - reserved);
+          return {
+            slot_start: slot.slotStart.toISO()!,
+            slot_end: slot.slotEnd.toISO()!,
+            capacity: slot.capacity,
+            reserved,
+            available,
+            bookable: available > 0 && isWithinBookingWindow(service, slot.slotStart, now),
+          };
+        });
+    }
+
+    return result;
+  }
+
   async getAvailabilityBySlot(
     serviceId: string,
     datetimeStr: string,

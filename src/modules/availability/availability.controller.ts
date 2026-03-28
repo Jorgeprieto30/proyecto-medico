@@ -23,6 +23,21 @@ export class AvailabilityController {
     return this.availabilityService.getAvailabilityByDate(serviceId, date, includePast);
   }
 
+  @Get('range')
+  @ApiOperation({ summary: 'Consultar disponibilidad por rango de fechas (batch)' })
+  @ApiQuery({ name: 'service_id', type: String })
+  @ApiQuery({ name: 'start_date', type: String, example: '2026-03-23' })
+  @ApiQuery({ name: 'end_date', type: String, example: '2026-03-29' })
+  @ApiQuery({ name: 'include_past', type: Boolean, required: false })
+  getByDateRange(
+    @Query('service_id') serviceId: string,
+    @Query('start_date') startDate: string,
+    @Query('end_date') endDate: string,
+    @Query('include_past', new DefaultValuePipe(false), ParseBoolPipe) includePast: boolean,
+  ): Promise<Record<string, any[]>> {
+    return this.availabilityService.getAvailabilityByDateRange(serviceId, startDate, endDate, includePast);
+  }
+
   @Get('slot')
   @ApiOperation({ summary: 'Consultar disponibilidad de un bloque puntual' })
   @ApiQuery({ name: 'service_id', type: String })
