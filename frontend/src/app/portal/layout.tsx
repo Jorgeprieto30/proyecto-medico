@@ -77,12 +77,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           <Link href="/portal" className="flex items-center">
             <CampusHeaderLogo />
           </Link>
-          <nav className="flex items-center gap-3">
+          <nav className="flex items-center gap-2 sm:gap-3">
             {mounted && profile ? (
               <>
                 <Link
                   href="/portal/mis-reservas"
-                  className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
+                  className="text-xs sm:text-sm text-gray-600 hover:text-blue-600 transition-colors"
                 >
                   Mis reservas
                 </Link>
@@ -94,7 +94,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 </Link>
                 <button
                   onClick={handleLogout}
-                  className="text-sm text-gray-500 hover:text-red-600 transition-colors"
+                  className="text-xs sm:text-sm text-gray-500 hover:text-red-600 transition-colors"
                 >
                   Salir
                 </button>
@@ -103,13 +103,13 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               <>
                 <Link
                   href="/portal/login"
-                  className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
+                  className="text-xs sm:text-sm text-gray-600 hover:text-blue-600 transition-colors"
                 >
                   Ingresar
                 </Link>
                 <Link
                   href="/portal/register"
-                  className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors"
+                  className="text-xs sm:text-sm bg-blue-600 text-white px-2.5 py-1.5 sm:px-3 rounded-md hover:bg-blue-700 transition-colors"
                 >
                   Registrarse
                 </Link>
