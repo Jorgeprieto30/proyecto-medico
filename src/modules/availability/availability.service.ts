@@ -36,6 +36,7 @@ const ACTIVE_STATUSES: ReservationStatus[] = [
 
 /** Devuelve true si el plazo de reserva aún NO ha cerrado para este slot */
 function isWithinBookingWindow(service: Service, slotStart: DateTime, now: DateTime): boolean {
+  if (!service.bookingCutoffEnabled) return true; // sin restricción
   let cutoffDt: DateTime;
   if (service.bookingCutoffMode === 'day_before') {
     cutoffDt = slotStart

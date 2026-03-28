@@ -9,6 +9,7 @@ export interface Service {
   spotLabel: string | null;
   isActive: boolean;
   userId: string | null;
+  bookingCutoffEnabled: boolean;
   bookingCutoffMode: 'hours' | 'day_before';
   bookingCutoffHours: number;
   createdAt: string;
@@ -23,6 +24,7 @@ export interface CreateServiceDto {
   maxSpots: number;
   spotLabel?: string;
   isActive?: boolean;
+  bookingCutoffEnabled?: boolean;
   bookingCutoffMode?: 'hours' | 'day_before';
   bookingCutoffHours?: number;
 }

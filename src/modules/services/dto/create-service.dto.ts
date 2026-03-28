@@ -64,6 +64,11 @@ export class CreateServiceDto {
   @IsOptional()
   isActive?: boolean;
 
+  @ApiPropertyOptional({ example: false, description: 'Activar el plazo mínimo de reserva' })
+  @IsBoolean()
+  @IsOptional()
+  bookingCutoffEnabled?: boolean;
+
   @ApiPropertyOptional({
     example: 'hours',
     enum: ['hours', 'day_before'],

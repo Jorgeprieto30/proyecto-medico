@@ -57,23 +57,23 @@ export class ReservationsService {
       );
     }
 
-    // Validar plazo de reserva (booking cutoff)
-    const now = DateTime.now().toUTC();
-    const slotStartLuxon = DateTime.fromJSDate(slotStartUtc, { zone: 'UTC' });
-    let cutoffDt: DateTime;
-    if (service.bookingCutoffMode === 'day_before') {
-      // El plazo cierra a las 00:01 del día anterior en la zona horaria del servicio
-      cutoffDt = slotStartLuxon
-        .setZone(service.timezone)
-        .startOf('day')
-        .minus({ days: 1 })
-        .plus({ minutes: 1 });
-    } else {
-      // hours: el plazo cierra N horas antes del inicio
-      cutoffDt = slotStartLuxon.minus({ hours: service.bookingCutoffHours });
-    }
-    if (now > cutoffDt.toUTC()) {
-      throw new BadRequestException('El plazo de reserva para este horario ha cerrado.');
+    // Validar plazo de reserva (booking cutoff) — solo si está habilitado
+    if (service.bookingCutoffEnabled) {
+      const now = DateTime.now().toUTC();
+      const slotStartLuxon = DateTime.fromJSDate(slotStartUtc, { zone: 'UTC' });
+      let cutoffDt: DateTime;
+      if (service.bookingCutoffMode === 'day_before') {
+        cutoffDt = slotStartLuxon
+          .setZone(service.timezone)
+          .startOf('day')
+          .minus({ days: 1 })
+          .plus({ minutes: 1 });
+      } else {
+        cutoffDt = slotStartLuxon.minus({ hours: service.bookingCutoffHours });
+      }
+      if (now > cutoffDt.toUTC()) {
+        throw new BadRequestException('El plazo de reserva para este horario ha cerrado.');
+      }
     }
 
     // Validar spot_number si viene explícito

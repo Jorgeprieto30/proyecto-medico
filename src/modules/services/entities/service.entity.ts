@@ -44,6 +44,10 @@ export class Service {
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
+  @ApiProperty({ example: false, description: 'Si es true, se aplica el plazo mínimo de reserva configurado' })
+  @Column({ name: 'booking_cutoff_enabled', default: false })
+  bookingCutoffEnabled: boolean;
+
   @ApiProperty({
     example: 'hours',
     description: 'Modo de cierre de reservas: "hours" = X horas antes del evento, "day_before" = día anterior a las 00:01',

@@ -49,8 +49,9 @@ const createSchema = z.object({
   maxSpots:            z.coerce.number().min(1, 'Mínimo 1').max(500, 'Máximo 500'),
   namedSpots:          z.boolean(),
   spotLabel:           z.string().optional(),
-  bookingCutoffMode:   z.enum(['hours', 'day_before']),
-  bookingCutoffHours:  z.coerce.number().min(0).max(168),
+  bookingCutoffEnabled: z.boolean(),
+  bookingCutoffMode:    z.enum(['hours', 'day_before']),
+  bookingCutoffHours:   z.coerce.number().min(0).max(168),
   days:                z.array(z.number()).min(1, 'Selecciona al menos un día'),
   timeSlots: z.array(timeSlotSchema).min(1, 'Agrega al menos un horario'),
   validFrom:           z.string().optional(),
@@ -61,7 +62,7 @@ type CreateForm = z.infer<typeof createSchema>;
 const DEFAULT_CREATE: CreateForm = {
   name: '', description: '', timezone: 'America/Santiago',
   slotDurationMinutes: 60, maxSpots: 20, namedSpots: false, spotLabel: '',
-  bookingCutoffMode: 'hours', bookingCutoffHours: 24,
+  bookingCutoffEnabled: false, bookingCutoffMode: 'hours', bookingCutoffHours: 24,
   days: [],
   timeSlots: [{ startTime: '08:00', endTime: '09:00' }],
   validFrom: todayAsString(), validUntil: '',
@@ -96,6 +97,7 @@ export default function EventosPage() {
 
   const selectedDays = watch('days');
   const namedSpots = watch('namedSpots');
+  const cutoffEnabled = watch('bookingCutoffEnabled');
   const cutoffMode = watch('bookingCutoffMode');
 
   const openCreate = () => { reset(DEFAULT_CREATE); setCreateOpen(true); };
@@ -109,6 +111,7 @@ export default function EventosPage() {
         slotDurationMinutes: data.slotDurationMinutes,
         maxSpots: data.maxSpots,
         spotLabel: data.namedSpots ? (data.spotLabel || undefined) : undefined,
+        bookingCutoffEnabled: data.bookingCutoffEnabled,
         bookingCutoffMode: data.bookingCutoffMode,
         bookingCutoffHours: data.bookingCutoffMode === 'hours' ? data.bookingCutoffHours : 24,
       });
@@ -271,62 +274,85 @@ export default function EventosPage() {
 
           {/* Booking cutoff rule */}
           <div className="border rounded-lg p-4 bg-gray-50 space-y-3">
-            <div>
-              <p className="text-sm font-medium text-gray-700">Plazo de reserva</p>
-              <p className="text-xs text-gray-400 mt-0.5">¿Con cuánta anticipación se puede reservar?</p>
-            </div>
-            <Controller
-              name="bookingCutoffMode"
-              control={control}
-              render={({ field }) => (
-                <div className="flex gap-3">
-                  <label className={`flex-1 flex items-start gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
-                    field.value === 'hours' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'
-                  }`}>
-                    <input
-                      type="radio"
-                      value="hours"
-                      checked={field.value === 'hours'}
-                      onChange={() => field.onChange('hours')}
-                      className="mt-0.5"
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Horas de anticipación</p>
-                      <p className="text-xs text-gray-400">Cierra N horas antes del evento</p>
-                    </div>
-                  </label>
-                  <label className={`flex-1 flex items-start gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
-                    field.value === 'day_before' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'
-                  }`}>
-                    <input
-                      type="radio"
-                      value="day_before"
-                      checked={field.value === 'day_before'}
-                      onChange={() => field.onChange('day_before')}
-                      className="mt-0.5"
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Día anterior</p>
-                      <p className="text-xs text-gray-400">Cierra el día anterior a las 00:01</p>
-                    </div>
-                  </label>
-                </div>
-              )}
-            />
-            {cutoffMode === 'hours' && (
-              <div className="flex items-center gap-3">
-                <Input
-                  type="number" min={0} max={168}
-                  {...register('bookingCutoffHours')}
-                  className="w-24"
-                />
-                <span className="text-sm text-gray-600">horas antes del evento</span>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Plazo de reserva</p>
+                <p className="text-xs text-gray-400 mt-0.5">Limitar con cuánta anticipación se puede reservar</p>
               </div>
-            )}
-            {cutoffMode === 'day_before' && (
-              <p className="text-xs text-gray-500">
-                Ej: si el evento es el martes, el plazo cierra el lunes a las 00:01 (hora del servicio).
-              </p>
+              <Controller
+                name="bookingCutoffEnabled"
+                control={control}
+                render={({ field }) => (
+                  <button
+                    type="button"
+                    onClick={() => field.onChange(!field.value)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      field.value ? 'bg-blue-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                      field.value ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                )}
+              />
+            </div>
+            {cutoffEnabled && (
+              <>
+                <Controller
+                  name="bookingCutoffMode"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="flex gap-3">
+                      <label className={`flex-1 flex items-start gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                        field.value === 'hours' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'
+                      }`}>
+                        <input
+                          type="radio"
+                          value="hours"
+                          checked={field.value === 'hours'}
+                          onChange={() => field.onChange('hours')}
+                          className="mt-0.5"
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">Horas de anticipación</p>
+                          <p className="text-xs text-gray-400">Cierra N horas antes del evento</p>
+                        </div>
+                      </label>
+                      <label className={`flex-1 flex items-start gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                        field.value === 'day_before' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'
+                      }`}>
+                        <input
+                          type="radio"
+                          value="day_before"
+                          checked={field.value === 'day_before'}
+                          onChange={() => field.onChange('day_before')}
+                          className="mt-0.5"
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">Día anterior</p>
+                          <p className="text-xs text-gray-400">Cierra el día anterior a las 00:01</p>
+                        </div>
+                      </label>
+                    </div>
+                  )}
+                />
+                {cutoffMode === 'hours' && (
+                  <div className="flex items-center gap-3">
+                    <Input
+                      type="number" min={0} max={168}
+                      {...register('bookingCutoffHours')}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-gray-600">horas antes del evento</span>
+                  </div>
+                )}
+                {cutoffMode === 'day_before' && (
+                  <p className="text-xs text-gray-500">
+                    Ej: si el evento es el martes, el plazo cierra el lunes a las 00:01 (hora del servicio).
+                  </p>
+                )}
+              </>
             )}
           </div>
 
