@@ -8,6 +8,7 @@ import type {
   SlotAvailability, SlotDetail, SlotSpots,
   Reservation, CreateReservationDto,
   SessionSpotOverride,
+  MemberSummary,
 } from '@/types';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
@@ -158,4 +159,21 @@ export const reservationsApi = {
     request<Reservation>('/reservations', { method: 'POST', body: JSON.stringify(dto) }),
   cancel: (id: number) =>
     request<Reservation>(`/reservations/${id}/cancel`, { method: 'PATCH' }),
+};
+
+// ─── Members (admin) ─────────────────────────────────────────────────────────
+export const membersAdminApi = {
+  search: (q: string) =>
+    request<MemberSummary[]>(`/members/search?q=${encodeURIComponent(q)}`),
+  create: (dto: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    rut?: string;
+    birth_date?: string;
+  }) =>
+    request<MemberSummary>('/members/admin-create', {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    }),
 };

@@ -16,6 +16,7 @@ import { MailService } from '../mail/mail.service';
 import { RegisterMemberDto } from './dto/register-member.dto';
 import { LoginMemberDto } from './dto/login-member.dto';
 import { UpdateMemberDto, ChangePasswordDto } from './dto/update-member.dto';
+import { AdminCreateMemberDto } from './dto/admin-create-member.dto';
 
 function normalizeRut(rut: string): string {
   const clean = rut.replace(/\./g, '').replace(/\s/g, '').toUpperCase();
@@ -51,14 +52,41 @@ export class MembersService {
   ) {}
 
   async register(dto: RegisterMemberDto) {
-    const existing = await this.memberRepo.findOne({ where: { email: dto.email } });
-    if (existing) throw new ConflictException('No fue posible completar el registro. Verifica los datos e intenta nuevamente.');
-
     const password_hash = await bcrypt.hash(dto.password, 12);
     const normalizedRut = dto.rut ? normalizeRut(dto.rut) : null;
     if (normalizedRut && !isValidRut(normalizedRut)) {
       throw new BadRequestException('RUT inválido');
     }
+
+    // Link pre-registered account if same RUT and no password set
+    if (normalizedRut) {
+      const preRegistered = await this.memberRepo
+        .createQueryBuilder('m')
+        .addSelect('m.password_hash')
+        .where('m.rut = :rut', { rut: normalizedRut })
+        .getOne();
+
+      if (preRegistered && !preRegistered.password_hash) {
+        if (preRegistered.email !== dto.email) {
+          const emailTaken = await this.memberRepo.findOne({ where: { email: dto.email } });
+          if (emailTaken) {
+            throw new ConflictException('No fue posible completar el registro. Verifica los datos e intenta nuevamente.');
+          }
+        }
+        await this.memberRepo.update(preRegistered.id, {
+          email: dto.email,
+          first_name: dto.first_name,
+          last_name: dto.last_name,
+          birth_date: dto.birth_date ?? preRegistered.birth_date,
+          password_hash,
+        });
+        const linked = await this.findById(preRegistered.id);
+        return this.buildResponse(linked!);
+      }
+    }
+
+    const existing = await this.memberRepo.findOne({ where: { email: dto.email } });
+    if (existing) throw new ConflictException('No fue posible completar el registro. Verifica los datos e intenta nuevamente.');
 
     const member = this.memberRepo.create({
       first_name: dto.first_name,
@@ -175,6 +203,44 @@ export class MembersService {
       reset_password_token: null,
       reset_password_expires: null,
     });
+  }
+
+  async adminCreate(dto: AdminCreateMemberDto): Promise<Member> {
+    const existing = await this.memberRepo.findOne({ where: { email: dto.email } });
+    if (existing) {
+      throw new ConflictException('Ya existe un cliente registrado con ese email.');
+    }
+
+    let normalizedRut: string | null = null;
+    if (dto.rut) {
+      normalizedRut = normalizeRut(dto.rut);
+      if (!isValidRut(normalizedRut)) throw new BadRequestException('RUT inválido');
+      const existingRut = await this.memberRepo.findOne({ where: { rut: normalizedRut } });
+      if (existingRut) throw new ConflictException('Ya existe un cliente registrado con ese RUT.');
+    }
+
+    const member = this.memberRepo.create({
+      first_name: dto.first_name,
+      last_name: dto.last_name,
+      email: dto.email,
+      rut: normalizedRut,
+      birth_date: dto.birth_date ?? null,
+      // no password_hash — pre-registered by admin
+    });
+    return this.memberRepo.save(member);
+  }
+
+  async searchMembers(q: string): Promise<Member[]> {
+    if (!q || q.trim().length < 2) return [];
+    const term = `%${q.trim().toLowerCase()}%`;
+    return this.memberRepo
+      .createQueryBuilder('m')
+      .where(`LOWER(m.first_name || ' ' || m.last_name) LIKE :term`, { term })
+      .orWhere('LOWER(m.rut) LIKE :term', { term })
+      .orWhere('LOWER(m.email) LIKE :term', { term })
+      .orderBy('m.first_name', 'ASC')
+      .limit(10)
+      .getMany();
   }
 
   private buildResponse(member: Member) {

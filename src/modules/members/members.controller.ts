@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
   Post,
   Patch,
+  Query,
   Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
@@ -16,6 +17,7 @@ import { MembersService } from './members.service';
 import { RegisterMemberDto } from './dto/register-member.dto';
 import { LoginMemberDto } from './dto/login-member.dto';
 import { UpdateMemberDto, ChangePasswordDto } from './dto/update-member.dto';
+import { AdminCreateMemberDto } from './dto/admin-create-member.dto';
 import { ForgotPasswordMemberDto } from './dto/forgot-password-member.dto';
 import { ResetPasswordMemberDto } from './dto/reset-password-member.dto';
 import { Member } from './decorators/member.decorator';
@@ -36,6 +38,18 @@ export class MembersController {
     private readonly mailService: MailService,
     private readonly servicesService: ServicesService,
   ) {}
+
+  @Get('search')
+  @ApiOperation({ summary: '[Admin] Buscar miembros por nombre, RUT o email' })
+  searchMembers(@Query('q') q: string) {
+    return this.membersService.searchMembers(q ?? '');
+  }
+
+  @Post('admin-create')
+  @ApiOperation({ summary: '[Admin] Registrar un cliente sin contraseña' })
+  adminCreate(@Body() dto: AdminCreateMemberDto) {
+    return this.membersService.adminCreate(dto);
+  }
 
   @Public()
   @Throttle({ default: { ttl: 60_000, limit: 5 } })

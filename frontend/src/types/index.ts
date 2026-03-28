@@ -182,3 +182,12 @@ export interface ApiError {
   timestamp: string;
   path: string;
 }
+
+// ─── Members (admin) ─────────────────────────────────────────────────────────
+export interface MemberSummary {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  rut: string | null;
+}
