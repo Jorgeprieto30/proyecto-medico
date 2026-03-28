@@ -1,17 +1,17 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ChevronLeft, ChevronRight, Download, Info, UserPlus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Info, UserPlus, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { servicesApi, availabilityApi, reservationsApi } from '@/lib/api';
-import type { Service } from '@/types';
+import { servicesApi, availabilityApi, reservationsApi, membersAdminApi } from '@/lib/api';
+import type { Service, MemberSummary } from '@/types';
 import type { SlotAvailability } from '@/types';
-import { todayAsString, validateRut, normalizeRut, escapeHtml } from '@/lib/utils';
+import { todayAsString, normalizeRut, escapeHtml } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -638,15 +638,16 @@ function YearView({ date, onSelectDate }: { date: string; onSelectDate: (d: stri
 // ─── Reserve form schema ──────────────────────────────────────────────────────
 
 const reserveSchema = z.object({
-  customer_name:        z.string().min(1, 'Nombre requerido'),
-  customer_email:       z.string().email('Email inválido').optional().or(z.literal('')),
-  customer_external_id: z.string().optional().refine(
-    (v) => !v || validateRut(v),
-    { message: 'RUT inválido (ej: 12.345.678-9)' },
-  ),
-  spot_number:          z.coerce.number().min(1, 'Selecciona un cupo'),
+  spot_number: z.coerce.number().min(1, 'Selecciona un cupo'),
 });
 type ReserveForm = z.infer<typeof reserveSchema>;
+
+const createClientSchema = z.object({
+  first_name: z.string().min(1, 'Requerido'),
+  last_name:  z.string().min(1, 'Requerido'),
+  email:      z.string().email('Email inválido'),
+});
+type CreateClientForm = z.infer<typeof createClientSchema>;
 
 // ─── Slot Detail ──────────────────────────────────────────────────────────────
 
@@ -658,6 +659,37 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
   const [savingOverride, setSavingOverride] = useState(false);
   const pct = slot.capacity > 0 ? (slot.reserved / slot.capacity) * 100 : 0;
   const date = slot.slot_start.split('T')[0];
+
+  // Client selection state
+  const [selectedMember, setSelectedMember] = useState<MemberSummary | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setShowDropdown(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Search members query
+  const { data: searchResults = [] } = useQuery({
+    queryKey: ['members-search', debouncedQuery],
+    queryFn: () => membersAdminApi.search(debouncedQuery),
+    enabled: debouncedQuery.length >= 2,
+    staleTime: 30_000,
+  });
 
   // Load service details to get spotLabel
   const { data: services = [] } = useQuery({ queryKey: ['services'], queryFn: servicesApi.list });
@@ -674,10 +706,35 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
     (r) => new Date(r.slotStart).getTime() === slotTs && r.status !== 'cancelled',
   ) ?? [];
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ReserveForm>({
+  const { handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ReserveForm>({
     resolver: zodResolver(reserveSchema),
   });
   const selectedSpotNumber = watch('spot_number');
+
+  const {
+    register: registerCreate,
+    handleSubmit: handleSubmitCreate,
+    reset: resetCreate,
+    formState: { errors: createErrors },
+  } = useForm<CreateClientForm>({
+    resolver: zodResolver(createClientSchema),
+  });
+
+  // Create member mutation
+  const createMemberMutation = useMutation({
+    mutationFn: (data: CreateClientForm) => membersAdminApi.create({
+      first_name: data.first_name,
+      last_name: data.last_name,
+      email: data.email,
+    }),
+    onSuccess: (member) => {
+      setSelectedMember(member);
+      setShowCreateForm(false);
+      resetCreate();
+      toast.success(`Cliente ${member.first_name} ${member.last_name} registrado`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const reserveMutation = useMutation({
     mutationFn: (data: ReserveForm) =>
@@ -685,20 +742,30 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
         service_id: slot.serviceId,
         slot_start: slot.slot_start,
         spot_number: data.spot_number,
-        customer_name: data.customer_name,
-        customer_external_id: data.customer_external_id ? normalizeRut(data.customer_external_id) : undefined,
-        metadata: data.customer_email ? { email: data.customer_email } : undefined,
+        customer_name: selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name}` : '',
+        customer_external_id: selectedMember?.rut ?? undefined,
+        metadata: selectedMember ? { member_id: selectedMember.id } : undefined,
       }),
     onSuccess: () => {
       toast.success('Reserva creada correctamente');
       reset();
       setShowForm(false);
+      setSelectedMember(null);
+      setSearchQuery('');
+      setShowCreateForm(false);
       qc.invalidateQueries({ queryKey: ['slot-reservations', slot.serviceId, date] });
       qc.invalidateQueries({ queryKey: ['calendar'] });
       qc.invalidateQueries({ queryKey: ['reservations-all'] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const selectMember = (m: MemberSummary) => {
+    setSelectedMember(m);
+    setSearchQuery('');
+    setShowDropdown(false);
+    setShowCreateForm(false);
+  };
 
   const handleSaveOverride = async () => {
     const n = parseInt(overrideSpots, 10);
@@ -934,7 +1001,8 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
             <button onClick={() => { setShowForm(false); reset(); }}
               className="text-xs text-gray-400 hover:text-gray-600">✕ Cancelar</button>
           </div>
-          <form onSubmit={handleSubmit((d) => reserveMutation.mutate(d))} className="space-y-3">
+          <div className="space-y-3">
+            {/* Spot selection */}
             <div>
               <Label className="text-xs">Selecciona {spotLabel ? `una ${spotLabel}` : 'un cupo'} *</Label>
               <div className="mt-1.5 grid grid-cols-5 gap-1.5">
@@ -962,27 +1030,96 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
               </div>
               {errors.spot_number && <p className="text-xs text-red-500 mt-0.5">{errors.spot_number.message}</p>}
             </div>
+
+            {/* Client selector */}
             <div>
-              <Label className="text-xs">Nombre del cliente *</Label>
-              <Input {...register('customer_name')} className="mt-1 h-8 text-sm" placeholder="ej: Juan Pérez" />
-              {errors.customer_name && <p className="text-xs text-red-500 mt-0.5">{errors.customer_name.message}</p>}
+              <Label className="text-xs">Cliente *</Label>
+              {selectedMember ? (
+                <div className="mt-1 flex items-center justify-between p-2.5 border border-blue-200 bg-blue-50 rounded-lg">
+                  <div>
+                    <p className="text-sm font-semibold text-blue-900">
+                      {selectedMember.first_name} {selectedMember.last_name}
+                    </p>
+                    <p className="text-xs text-blue-600">
+                      {selectedMember.email}{selectedMember.rut ? ` · ${selectedMember.rut}` : ''}
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => setSelectedMember(null)}
+                    className="p-1 rounded-full hover:bg-blue-100 text-blue-400 hover:text-blue-600">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-1 space-y-2">
+                  <div className="relative" ref={searchRef}>
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                    <Input
+                      value={searchQuery}
+                      onChange={(e) => { setSearchQuery(e.target.value); setShowDropdown(true); }}
+                      onFocus={() => setShowDropdown(true)}
+                      placeholder="Buscar por nombre o email..."
+                      className="h-8 text-sm pl-8"
+                    />
+                    {showDropdown && debouncedQuery.length >= 2 && (
+                      <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                        {searchResults.length === 0 ? (
+                          <p className="px-3 py-2 text-xs text-gray-400">Sin resultados</p>
+                        ) : (
+                          searchResults.map((m) => (
+                            <button key={m.id} type="button" onMouseDown={() => selectMember(m)}
+                              className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors border-b last:border-b-0">
+                              <p className="text-sm font-medium text-gray-800">{m.first_name} {m.last_name}</p>
+                              <p className="text-xs text-gray-400">{m.email}{m.rut ? ` · ${m.rut}` : ''}</p>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <button type="button"
+                    onClick={() => { setShowCreateForm((v) => !v); setShowDropdown(false); }}
+                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800">
+                    <UserPlus className="h-3.5 w-3.5" />
+                    {showCreateForm ? 'Cancelar' : 'Registrar cliente nuevo'}
+                  </button>
+                  {showCreateForm && (
+                    <form onSubmit={handleSubmitCreate((d) => createMemberMutation.mutate(d))}
+                      className="border rounded-lg p-3 bg-white space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-xs">Nombre *</Label>
+                          <Input {...registerCreate('first_name')} className="mt-0.5 h-7 text-sm" placeholder="María" />
+                          {createErrors.first_name && <p className="text-xs text-red-500">{createErrors.first_name.message}</p>}
+                        </div>
+                        <div>
+                          <Label className="text-xs">Apellido *</Label>
+                          <Input {...registerCreate('last_name')} className="mt-0.5 h-7 text-sm" placeholder="González" />
+                          {createErrors.last_name && <p className="text-xs text-red-500">{createErrors.last_name.message}</p>}
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Email *</Label>
+                        <Input type="email" {...registerCreate('email')} className="mt-0.5 h-7 text-sm" placeholder="maria@ejemplo.com" />
+                        {createErrors.email && <p className="text-xs text-red-500">{createErrors.email.message}</p>}
+                      </div>
+                      <Button type="submit" size="sm" className="w-full" disabled={createMemberMutation.isPending}>
+                        {createMemberMutation.isPending ? 'Registrando...' : 'Registrar'}
+                      </Button>
+                    </form>
+                  )}
+                </div>
+              )}
             </div>
-            <div>
-              <Label className="text-xs">Email (opcional)</Label>
-              <Input type="email" {...register('customer_email')} className="mt-1 h-8 text-sm" placeholder="ej: juan@mail.com" />
-              {errors.customer_email && <p className="text-xs text-red-500 mt-0.5">{errors.customer_email.message}</p>}
-            </div>
-            <div>
-              <Label className="text-xs">RUT (opcional)</Label>
-              <Input {...register('customer_external_id')} className="mt-1 h-8 text-sm" placeholder="ej: 12.345.678-9" />
-              {errors.customer_external_id && <p className="text-xs text-red-500 mt-0.5">{errors.customer_external_id.message}</p>}
-            </div>
-            <div className="flex gap-2 pt-1">
-              <Button type="submit" className="flex-1" disabled={reserveMutation.isPending}>
-                {reserveMutation.isPending ? 'Reservando...' : 'Confirmar reserva'}
-              </Button>
-            </div>
-          </form>
+
+            {/* Confirm button */}
+            {selectedMember && (
+              <form onSubmit={handleSubmit((d) => reserveMutation.mutate(d))}>
+                <Button type="submit" className="w-full" disabled={reserveMutation.isPending}>
+                  {reserveMutation.isPending ? 'Reservando...' : 'Confirmar reserva'}
+                </Button>
+              </form>
+            )}
+          </div>
         </div>
       )}
     </div>

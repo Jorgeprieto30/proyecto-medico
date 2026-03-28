@@ -52,42 +52,38 @@ export class MembersService {
   ) {}
 
   async register(dto: RegisterMemberDto) {
-    const password_hash = await bcrypt.hash(dto.password, 12);
     const normalizedRut = dto.rut ? normalizeRut(dto.rut) : null;
     if (normalizedRut && !isValidRut(normalizedRut)) {
       throw new BadRequestException('RUT inválido');
     }
 
-    // Link pre-registered account if same RUT and no password set
-    if (normalizedRut) {
-      const preRegistered = await this.memberRepo
-        .createQueryBuilder('m')
-        .addSelect('m.password_hash')
-        .where('m.rut = :rut', { rut: normalizedRut })
-        .getOne();
+    // Check if pre-registered account exists with same email (no password)
+    const existing = await this.memberRepo
+      .createQueryBuilder('m')
+      .addSelect('m.password_hash')
+      .where('m.email = :email', { email: dto.email })
+      .getOne();
 
-      if (preRegistered && !preRegistered.password_hash) {
-        if (preRegistered.email !== dto.email) {
-          const emailTaken = await this.memberRepo.findOne({ where: { email: dto.email } });
-          if (emailTaken) {
-            throw new ConflictException('No fue posible completar el registro. Verifica los datos e intenta nuevamente.');
-          }
-        }
-        await this.memberRepo.update(preRegistered.id, {
-          email: dto.email,
-          first_name: dto.first_name,
-          last_name: dto.last_name,
-          birth_date: dto.birth_date ?? preRegistered.birth_date,
-          password_hash,
-        });
-        const linked = await this.findById(preRegistered.id);
-        return this.buildResponse(linked!);
+    if (existing) {
+      if (existing.password_hash) {
+        // Already has a full account → reject
+        throw new ConflictException('No fue posible completar el registro. Verifica los datos e intenta nuevamente.');
       }
+      // Pre-registered by admin → link: set password + complete profile
+      const password_hash = await bcrypt.hash(dto.password, 12);
+      await this.memberRepo.update(existing.id, {
+        first_name: dto.first_name,
+        last_name: dto.last_name,
+        rut: normalizedRut ?? existing.rut,
+        birth_date: dto.birth_date ?? existing.birth_date,
+        password_hash,
+      });
+      const linked = await this.findById(existing.id);
+      return this.buildResponse(linked!);
     }
 
-    const existing = await this.memberRepo.findOne({ where: { email: dto.email } });
-    if (existing) throw new ConflictException('No fue posible completar el registro. Verifica los datos e intenta nuevamente.');
-
+    // Normal registration
+    const password_hash = await bcrypt.hash(dto.password, 12);
     const member = this.memberRepo.create({
       first_name: dto.first_name,
       last_name: dto.last_name,
