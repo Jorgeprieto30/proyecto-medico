@@ -60,6 +60,10 @@ export class Service {
   @Column({ name: 'booking_cutoff_hours', default: 24 })
   bookingCutoffHours: number;
 
+  @ApiProperty({ example: 1, description: 'Días de anticipación para el cierre (solo aplica si booking_cutoff_mode = "day_before")' })
+  @Column({ name: 'booking_cutoff_days', default: 1 })
+  bookingCutoffDays: number;
+
   @ApiPropertyOptional({ nullable: true })
   @Column({ name: 'user_id', type: 'uuid', nullable: true })
   userId: string | null;

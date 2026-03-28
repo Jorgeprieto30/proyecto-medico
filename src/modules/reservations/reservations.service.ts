@@ -66,7 +66,7 @@ export class ReservationsService {
         cutoffDt = slotStartLuxon
           .setZone(service.timezone)
           .startOf('day')
-          .minus({ days: 1 })
+          .minus({ days: service.bookingCutoffDays ?? 1 })
           .plus({ minutes: 1 });
       } else {
         cutoffDt = slotStartLuxon.minus({ hours: service.bookingCutoffHours });

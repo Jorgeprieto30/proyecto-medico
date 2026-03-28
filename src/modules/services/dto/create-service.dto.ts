@@ -89,4 +89,16 @@ export class CreateServiceDto {
   @Max(168)
   @IsOptional()
   bookingCutoffHours?: number;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Días de anticipación para el cierre (solo cuando bookingCutoffMode = "day_before"). Default: 1.',
+    minimum: 1,
+    maximum: 30,
+  })
+  @IsInt()
+  @Min(1)
+  @Max(30)
+  @IsOptional()
+  bookingCutoffDays?: number;
 }

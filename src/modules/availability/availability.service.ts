@@ -42,7 +42,7 @@ function isWithinBookingWindow(service: Service, slotStart: DateTime, now: DateT
     cutoffDt = slotStart
       .setZone(service.timezone)
       .startOf('day')
-      .minus({ days: 1 })
+      .minus({ days: service.bookingCutoffDays ?? 1 })
       .plus({ minutes: 1 });
   } else {
     cutoffDt = slotStart.minus({ hours: service.bookingCutoffHours });

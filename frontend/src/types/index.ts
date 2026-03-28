@@ -12,6 +12,7 @@ export interface Service {
   bookingCutoffEnabled: boolean;
   bookingCutoffMode: 'hours' | 'day_before';
   bookingCutoffHours: number;
+  bookingCutoffDays: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,6 +28,7 @@ export interface CreateServiceDto {
   bookingCutoffEnabled?: boolean;
   bookingCutoffMode?: 'hours' | 'day_before';
   bookingCutoffHours?: number;
+  bookingCutoffDays?: number;
 }
 
 export type UpdateServiceDto = Partial<CreateServiceDto>;

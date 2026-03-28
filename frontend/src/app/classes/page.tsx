@@ -52,6 +52,7 @@ const createSchema = z.object({
   bookingCutoffEnabled: z.boolean(),
   bookingCutoffMode:    z.enum(['hours', 'day_before']),
   bookingCutoffHours:   z.coerce.number().min(0).max(168),
+  bookingCutoffDays:    z.coerce.number().min(1).max(30),
   days:                z.array(z.number()).min(1, 'Selecciona al menos un día'),
   timeSlots: z.array(timeSlotSchema).min(1, 'Agrega al menos un horario'),
   validFrom:           z.string().optional(),
@@ -62,7 +63,7 @@ type CreateForm = z.infer<typeof createSchema>;
 const DEFAULT_CREATE: CreateForm = {
   name: '', description: '', timezone: 'America/Santiago',
   slotDurationMinutes: 60, maxSpots: 20, namedSpots: false, spotLabel: '',
-  bookingCutoffEnabled: false, bookingCutoffMode: 'hours', bookingCutoffHours: 24,
+  bookingCutoffEnabled: false, bookingCutoffMode: 'hours', bookingCutoffHours: 24, bookingCutoffDays: 1,
   days: [],
   timeSlots: [{ startTime: '08:00', endTime: '09:00' }],
   validFrom: todayAsString(), validUntil: '',
@@ -114,6 +115,7 @@ export default function EventosPage() {
         bookingCutoffEnabled: data.bookingCutoffEnabled,
         bookingCutoffMode: data.bookingCutoffMode,
         bookingCutoffHours: data.bookingCutoffMode === 'hours' ? data.bookingCutoffHours : 24,
+        bookingCutoffDays: data.bookingCutoffMode === 'day_before' ? data.bookingCutoffDays : 1,
       });
       for (const day of data.days) {
         for (const slot of data.timeSlots) {
@@ -348,9 +350,14 @@ export default function EventosPage() {
                   </div>
                 )}
                 {cutoffMode === 'day_before' && (
-                  <p className="text-xs text-gray-500">
-                    Ej: si el evento es el martes, el plazo cierra el lunes a las 00:01 (hora del servicio).
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      type="number" min={1} max={30}
+                      {...register('bookingCutoffDays')}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-gray-600">días antes del evento</span>
+                  </div>
                 )}
               </>
             )}

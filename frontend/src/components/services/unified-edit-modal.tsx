@@ -41,6 +41,7 @@ const generalSchema = z.object({
   bookingCutoffEnabled: z.boolean(),
   bookingCutoffMode:    z.enum(['hours', 'day_before']),
   bookingCutoffHours:   z.coerce.number().min(0).max(168),
+  bookingCutoffDays:    z.coerce.number().min(1).max(30),
 });
 type GeneralForm = z.infer<typeof generalSchema>;
 
@@ -107,6 +108,7 @@ export function UnifiedEditModal({
                 bookingCutoffEnabled: service.bookingCutoffEnabled ?? false,
                 bookingCutoffMode: service.bookingCutoffMode ?? 'hours',
                 bookingCutoffHours: service.bookingCutoffHours ?? 24,
+                bookingCutoffDays: service.bookingCutoffDays ?? 1,
               } : undefined}
             />
           )}
@@ -151,6 +153,7 @@ function GeneralTab({
         bookingCutoffEnabled: rest.bookingCutoffEnabled,
         bookingCutoffMode: rest.bookingCutoffMode,
         bookingCutoffHours: rest.bookingCutoffMode === 'hours' ? rest.bookingCutoffHours : 24,
+        bookingCutoffDays: rest.bookingCutoffMode === 'day_before' ? rest.bookingCutoffDays : 1,
       });
     },
     onSuccess: () => {
@@ -325,9 +328,17 @@ function GeneralTab({
               </div>
             )}
             {cutoffMode === 'day_before' && (
-              <p className="text-xs text-gray-500">
-                Ej: si el evento es el martes, el plazo cierra el lunes a las 00:01 (hora del servicio).
-              </p>
+              <div className="flex items-center gap-3">
+                <Input
+                  type="number" min={1} max={30}
+                  {...register('bookingCutoffDays')}
+                  className="w-24"
+                />
+                <span className="text-sm text-gray-600">días antes del evento</span>
+                {errors.bookingCutoffDays && (
+                  <p className="text-xs text-red-500">{errors.bookingCutoffDays.message}</p>
+                )}
+              </div>
             )}
           </>
         )}
