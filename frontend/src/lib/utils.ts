@@ -100,6 +100,16 @@ export function todayAsString(): string {
   return new Date().toISOString().split('T')[0];
 }
 
+/** Escapa caracteres HTML especiales para uso seguro en plantillas de string */
+export function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 /** Normaliza RUT chileno: quita puntos, asegura guión antes del dígito verificador */
 export function normalizeRut(rut: string): string {
   const clean = rut.replace(/\./g, '').replace(/\s/g, '').toUpperCase();

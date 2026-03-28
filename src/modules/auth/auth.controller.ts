@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, HttpCode, Request } from '@nestjs/common';
+import { Controller, Post, Get, Body, HttpCode, Req, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
@@ -25,8 +25,9 @@ export class AuthController {
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Post('login')
   @ApiOperation({ summary: 'Iniciar sesión con email y contraseña' })
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  login(@Body() dto: LoginDto, @Req() req: any) {
+    const ip = req.ip ?? req.headers['x-forwarded-for'] ?? 'unknown';
+    return this.authService.login(dto, ip);
   }
 
   @Public()

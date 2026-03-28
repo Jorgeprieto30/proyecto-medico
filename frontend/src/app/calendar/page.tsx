@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { servicesApi, availabilityApi, reservationsApi } from '@/lib/api';
 import type { Service } from '@/types';
 import type { SlotAvailability } from '@/types';
-import { todayAsString, validateRut, normalizeRut } from '@/lib/utils';
+import { todayAsString, validateRut, normalizeRut, escapeHtml } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -824,12 +824,12 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
                   .map((r) => `
                     <tr>
                       <td>${r.spotNumber ?? '—'}</td>
-                      <td>${r.customerName ?? '—'}</td>
-                      <td>${r.customerExternalId ? normalizeRut(r.customerExternalId) : '—'}</td>
+                      <td>${r.customerName ? escapeHtml(r.customerName) : '—'}</td>
+                      <td>${r.customerExternalId ? escapeHtml(normalizeRut(r.customerExternalId)) : '—'}</td>
                       <td>${r.status === 'confirmed' ? 'Confirmado' : 'Pendiente'}</td>
                     </tr>`).join('');
                 const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
-                  <title>Asistentes - ${slot.serviceName}</title>
+                  <title>Asistentes - ${escapeHtml(slot.serviceName)}</title>
                   <style>
                     body { font-family: Arial, sans-serif; padding: 32px; color: #111; }
                     h1 { font-size: 20px; margin-bottom: 4px; }
@@ -841,7 +841,7 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
                     @media print { body { padding: 16px; } }
                   </style>
                 </head><body>
-                  <h1>${slot.serviceName}</h1>
+                  <h1>${escapeHtml(slot.serviceName)}</h1>
                   <div class="meta">
                     <span>Fecha: ${dateStr}</span> &nbsp;·&nbsp;
                     <span>Horario: ${startTime} – ${endTime}</span> &nbsp;·&nbsp;

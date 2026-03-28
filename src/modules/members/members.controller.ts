@@ -8,6 +8,7 @@ import {
   ParseIntPipe,
   Post,
   Patch,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -48,8 +49,9 @@ export class MembersController {
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @Post('login')
   @ApiOperation({ summary: 'Iniciar sesión como miembro' })
-  login(@Body() dto: LoginMemberDto) {
-    return this.membersService.login(dto);
+  login(@Body() dto: LoginMemberDto, @Req() req: any) {
+    const ip = req.ip ?? req.headers['x-forwarded-for'] ?? 'unknown';
+    return this.membersService.login(dto, ip);
   }
 
   @Public()

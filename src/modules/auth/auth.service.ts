@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
@@ -9,6 +9,8 @@ import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
@@ -20,13 +22,17 @@ export class AuthService {
     return this.buildResponse(user);
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, ip?: string) {
     const user = await this.usersService.findByEmail(dto.email);
     if (!user || !user.password_hash) {
+      this.logger.warn(`[AUTH] Login fallido — email no encontrado: ${dto.email} | ip: ${ip ?? 'unknown'}`);
       throw new UnauthorizedException('Credenciales incorrectas');
     }
     const valid = await bcrypt.compare(dto.password, user.password_hash);
-    if (!valid) throw new UnauthorizedException('Credenciales incorrectas');
+    if (!valid) {
+      this.logger.warn(`[AUTH] Login fallido — contraseña incorrecta: ${dto.email} | ip: ${ip ?? 'unknown'}`);
+      throw new UnauthorizedException('Credenciales incorrectas');
+    }
     return this.buildResponse(user);
   }
 

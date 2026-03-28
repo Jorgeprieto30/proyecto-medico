@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -40,6 +41,8 @@ function isValidRut(rut: string): boolean {
 
 @Injectable()
 export class MembersService {
+  private readonly logger = new Logger(MembersService.name);
+
   constructor(
     @InjectRepository(Member)
     private readonly memberRepo: Repository<Member>,
@@ -49,7 +52,7 @@ export class MembersService {
 
   async register(dto: RegisterMemberDto) {
     const existing = await this.memberRepo.findOne({ where: { email: dto.email } });
-    if (existing) throw new ConflictException('El email ya está registrado');
+    if (existing) throw new ConflictException('No fue posible completar el registro. Verifica los datos e intenta nuevamente.');
 
     const password_hash = await bcrypt.hash(dto.password, 12);
     const normalizedRut = dto.rut ? normalizeRut(dto.rut) : null;
@@ -69,7 +72,7 @@ export class MembersService {
     return this.buildResponse(saved);
   }
 
-  async login(dto: LoginMemberDto) {
+  async login(dto: LoginMemberDto, ip?: string) {
     const member = await this.memberRepo
       .createQueryBuilder('m')
       .addSelect('m.password_hash')
@@ -77,10 +80,14 @@ export class MembersService {
       .getOne();
 
     if (!member || !member.password_hash) {
+      this.logger.warn(`[MEMBERS] Login fallido — email no encontrado: ${dto.email} | ip: ${ip ?? 'unknown'}`);
       throw new UnauthorizedException('Credenciales incorrectas');
     }
     const valid = await bcrypt.compare(dto.password, member.password_hash);
-    if (!valid) throw new UnauthorizedException('Credenciales incorrectas');
+    if (!valid) {
+      this.logger.warn(`[MEMBERS] Login fallido — contraseña incorrecta: ${dto.email} | ip: ${ip ?? 'unknown'}`);
+      throw new UnauthorizedException('Credenciales incorrectas');
+    }
     return this.buildResponse(member);
   }
 
