@@ -1050,41 +1050,45 @@ function SlotDetail({ slot }: { slot: CalendarSlot }) {
                   </button>
                 </div>
               ) : (
-                <div className="mt-1 space-y-2">
+                <div className="mt-1">
                   <div className="relative" ref={searchRef}>
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
                     <Input
                       value={searchQuery}
-                      onChange={(e) => { setSearchQuery(e.target.value); setShowDropdown(true); }}
-                      onFocus={() => setShowDropdown(true)}
+                      onChange={(e) => { setSearchQuery(e.target.value); setShowDropdown(true); setShowCreateForm(false); }}
+                      onFocus={() => { if (searchQuery.length >= 2) setShowDropdown(true); }}
                       placeholder="Buscar por nombre o email..."
                       className="h-8 text-sm pl-8"
                     />
-                    {showDropdown && debouncedQuery.length >= 2 && (
-                      <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                        {searchResults.length === 0 ? (
-                          <p className="px-3 py-2 text-xs text-gray-400">Sin resultados</p>
-                        ) : (
-                          searchResults.map((m) => (
-                            <button key={m.id} type="button" onMouseDown={() => selectMember(m)}
-                              className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors border-b last:border-b-0">
-                              <p className="text-sm font-medium text-gray-800">{m.first_name} {m.last_name}</p>
-                              <p className="text-xs text-gray-400">{m.email}{m.rut ? ` · ${m.rut}` : ''}</p>
-                            </button>
-                          ))
+                    {showDropdown && debouncedQuery.length >= 2 && !showCreateForm && (
+                      <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                        {searchResults.map((m) => (
+                          <button key={m.id} type="button" onMouseDown={() => selectMember(m)}
+                            className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors border-b">
+                            <p className="text-sm font-medium text-gray-800">{m.first_name} {m.last_name}</p>
+                            <p className="text-xs text-gray-400">{m.email}{m.rut ? ` · ${m.rut}` : ''}</p>
+                          </button>
+                        ))}
+                        {searchResults.length === 0 && (
+                          <p className="px-3 py-2 text-xs text-gray-400">No se encontraron resultados</p>
                         )}
+                        <button type="button"
+                          onMouseDown={() => { setShowCreateForm(true); setShowDropdown(false); }}
+                          className="w-full text-left px-3 py-2.5 hover:bg-blue-50 transition-colors border-t border-gray-100 flex items-center gap-1.5 text-blue-600">
+                          <UserPlus className="h-3.5 w-3.5" />
+                          <span className="text-sm font-medium">Registrar cliente nuevo</span>
+                        </button>
                       </div>
                     )}
                   </div>
-                  <button type="button"
-                    onClick={() => { setShowCreateForm((v) => !v); setShowDropdown(false); }}
-                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800">
-                    <UserPlus className="h-3.5 w-3.5" />
-                    {showCreateForm ? 'Cancelar' : 'Registrar cliente nuevo'}
-                  </button>
                   {showCreateForm && (
                     <form onSubmit={handleSubmitCreate((d) => createMemberMutation.mutate(d))}
-                      className="border rounded-lg p-3 bg-white space-y-2">
+                      className="mt-2 border rounded-lg p-3 bg-white space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Nuevo cliente</p>
+                        <button type="button" onClick={() => setShowCreateForm(false)}
+                          className="text-xs text-gray-400 hover:text-gray-600">✕</button>
+                      </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <Label className="text-xs">Nombre *</Label>
