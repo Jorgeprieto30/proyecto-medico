@@ -332,7 +332,7 @@ export default function EventosPage() {
                         />
                         <div>
                           <p className="text-sm font-medium text-gray-700">Horas de anticipación</p>
-                          <p className="text-xs text-gray-400">Cierra N horas antes del evento</p>
+                          <p className="text-xs text-gray-400">Se abre N horas antes del evento</p>
                         </div>
                       </label>
                       <label className={`flex-1 flex items-start gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
@@ -347,7 +347,7 @@ export default function EventosPage() {
                         />
                         <div>
                           <p className="text-sm font-medium text-gray-700">Días antes</p>
-                          <p className="text-xs text-gray-400">Cierra N días antes a las 00:01</p>
+                          <p className="text-xs text-gray-400">Se abre N días antes a las 00:01</p>
                         </div>
                       </label>
                     </div>

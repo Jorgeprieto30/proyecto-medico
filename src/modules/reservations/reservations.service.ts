@@ -58,21 +58,27 @@ export class ReservationsService {
     }
 
     // Validar plazo de reserva (booking cutoff) — solo si está habilitado
+    // La ventana de reserva se ABRE N días/horas antes del slot.
     if (service.bookingCutoffEnabled) {
       const now = DateTime.now().toUTC();
       const slotStartLuxon = DateTime.fromJSDate(slotStartUtc, { zone: 'UTC' });
-      let cutoffDt: DateTime;
+      let opensDt: DateTime;
       if (service.bookingCutoffMode === 'day_before') {
-        cutoffDt = slotStartLuxon
+        opensDt = slotStartLuxon
           .setZone(service.timezone)
           .startOf('day')
           .minus({ days: service.bookingCutoffDays ?? 1 })
           .plus({ minutes: 1 });
       } else {
-        cutoffDt = slotStartLuxon.minus({ hours: service.bookingCutoffHours });
+        opensDt = slotStartLuxon.minus({ hours: service.bookingCutoffHours });
       }
-      if (now > cutoffDt.toUTC()) {
-        throw new BadRequestException('El plazo de reserva para este horario ha cerrado.');
+      if (now < opensDt.toUTC()) {
+        const daysOrHours = service.bookingCutoffMode === 'day_before'
+          ? `${service.bookingCutoffDays ?? 1} día(s) antes`
+          : `${service.bookingCutoffHours} hora(s) antes`;
+        throw new BadRequestException(
+          `La reserva para este horario aún no está disponible. Se abre ${daysOrHours} del evento.`,
+        );
       }
     }
 

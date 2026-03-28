@@ -159,7 +159,8 @@ function BookingModal({ booking, onClose, onConfirm, memberProfile }: {
       await Promise.all(allDays.map(async (d) => {
         if (d < today) return;
         try {
-          const data = await apiFetch(`/public/availability?service_id=${booking.service.id}&date=${d}`);
+          const raw = await apiFetch(`/public/availability?service_id=${booking.service.id}&date=${d}`);
+          const data = (raw as Slot[]).filter(sl => sl.bookable);
           const available = data.reduce((s: number, sl: Slot) => s + sl.available, 0);
           const capacity  = data.reduce((s: number, sl: Slot) => s + sl.capacity,  0);
           if (capacity > 0) results[d] = { available, capacity };
@@ -173,7 +174,10 @@ function BookingModal({ booking, onClose, onConfirm, memberProfile }: {
 
   const loadSlots = useCallback(async (d: string) => {
     setLoadingSlots(true); setSlots([]);
-    try { setSlots(await apiFetch(`/public/availability?service_id=${booking.service.id}&date=${d}`)); }
+    try {
+      const all: Slot[] = await apiFetch(`/public/availability?service_id=${booking.service.id}&date=${d}`);
+      setSlots(all.filter(s => s.bookable));
+    }
     catch { setSlots([]); }
     finally { setLoadingSlots(false); }
   }, [booking.service.id]);

@@ -34,20 +34,30 @@ const ACTIVE_STATUSES: ReservationStatus[] = [
   ReservationStatus.PENDING,
 ];
 
-/** Devuelve true si el plazo de reserva aún NO ha cerrado para este slot */
+/**
+ * Devuelve true si la ventana de reserva ya está abierta para este slot.
+ *
+ * ── day_before ──
+ *   La reserva se abre N días antes del evento a las 00:01 (hora local).
+ *   Ejemplo: clase lunes, cutoffDays=1 → se puede reservar desde el domingo 00:01.
+ *
+ * ── hours ──
+ *   La reserva se abre N horas antes del inicio del slot.
+ *   Ejemplo: clase lunes 19:00, cutoffHours=24 → se puede reservar desde domingo 19:00.
+ */
 function isWithinBookingWindow(service: Service, slotStart: DateTime, now: DateTime): boolean {
   if (!service.bookingCutoffEnabled) return true; // sin restricción
-  let cutoffDt: DateTime;
+  let opensDt: DateTime;
   if (service.bookingCutoffMode === 'day_before') {
-    cutoffDt = slotStart
+    opensDt = slotStart
       .setZone(service.timezone)
       .startOf('day')
       .minus({ days: service.bookingCutoffDays ?? 1 })
       .plus({ minutes: 1 });
   } else {
-    cutoffDt = slotStart.minus({ hours: service.bookingCutoffHours });
+    opensDt = slotStart.minus({ hours: service.bookingCutoffHours });
   }
-  return now.toUTC() <= cutoffDt.toUTC();
+  return now.toUTC() >= opensDt.toUTC();
 }
 
 @Injectable()
