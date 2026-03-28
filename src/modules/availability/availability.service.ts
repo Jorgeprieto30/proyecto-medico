@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { DateTime } from 'luxon';
+import { Service } from '../services/entities/service.entity';
 import { ServicesService } from '../services/services.service';
 import { ScheduleRulesService } from '../schedule-rules/schedule-rules.service';
 import { ExceptionsService } from '../exceptions/exceptions.service';
@@ -32,6 +33,21 @@ const ACTIVE_STATUSES: ReservationStatus[] = [
   ReservationStatus.CONFIRMED,
   ReservationStatus.PENDING,
 ];
+
+/** Devuelve true si el plazo de reserva aún NO ha cerrado para este slot */
+function isWithinBookingWindow(service: Service, slotStart: DateTime, now: DateTime): boolean {
+  let cutoffDt: DateTime;
+  if (service.bookingCutoffMode === 'day_before') {
+    cutoffDt = slotStart
+      .setZone(service.timezone)
+      .startOf('day')
+      .minus({ days: 1 })
+      .plus({ minutes: 1 });
+  } else {
+    cutoffDt = slotStart.minus({ hours: service.bookingCutoffHours });
+  }
+  return now.toUTC() <= cutoffDt.toUTC();
+}
 
 @Injectable()
 export class AvailabilityService {
@@ -69,6 +85,7 @@ export class AvailabilityService {
       slots.map((s) => s.slotStart),
     );
 
+    const now = DateTime.now().toUTC();
     return slots.map((slot) => {
       const key = slot.slotStart.toISO()!;
       const reserved = reservationCounts[key] ?? 0;
@@ -79,7 +96,7 @@ export class AvailabilityService {
         capacity: slot.capacity,
         reserved,
         available,
-        bookable: available > 0,
+        bookable: available > 0 && isWithinBookingWindow(service, slot.slotStart, now),
       };
     });
   }
@@ -130,6 +147,7 @@ export class AvailabilityService {
     const counts = await this.getReservationCountsBySlots(serviceId, [matchingSlot.slotStart]);
     const reserved = counts[matchingSlot.slotStart.toISO()!] ?? 0;
     const available = Math.max(0, matchingSlot.capacity - reserved);
+    const now = DateTime.now().toUTC();
 
     return {
       slot_start: matchingSlot.slotStart.toISO()!,
@@ -137,7 +155,7 @@ export class AvailabilityService {
       capacity: matchingSlot.capacity,
       reserved,
       available,
-      bookable: available > 0,
+      bookable: available > 0 && isWithinBookingWindow(service, matchingSlot.slotStart, now),
       exists: true,
     };
   }

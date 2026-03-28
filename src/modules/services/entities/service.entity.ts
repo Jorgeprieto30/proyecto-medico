@@ -44,6 +44,18 @@ export class Service {
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
+  @ApiProperty({
+    example: 'hours',
+    description: 'Modo de cierre de reservas: "hours" = X horas antes del evento, "day_before" = día anterior a las 00:01',
+    enum: ['hours', 'day_before'],
+  })
+  @Column({ name: 'booking_cutoff_mode', type: 'varchar', length: 20, default: 'hours' })
+  bookingCutoffMode: 'hours' | 'day_before';
+
+  @ApiProperty({ example: 24, description: 'Horas de anticipación mínima para reservar (solo aplica si booking_cutoff_mode = "hours")' })
+  @Column({ name: 'booking_cutoff_hours', default: 24 })
+  bookingCutoffHours: number;
+
   @ApiPropertyOptional({ nullable: true })
   @Column({ name: 'user_id', type: 'uuid', nullable: true })
   userId: string | null;

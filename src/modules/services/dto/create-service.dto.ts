@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsBoolean,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -62,4 +63,25 @@ export class CreateServiceDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    example: 'hours',
+    enum: ['hours', 'day_before'],
+    description: '"hours" = cerrar reservas X horas antes. "day_before" = cerrar el día anterior a las 00:01.',
+  })
+  @IsIn(['hours', 'day_before'])
+  @IsOptional()
+  bookingCutoffMode?: 'hours' | 'day_before';
+
+  @ApiPropertyOptional({
+    example: 24,
+    description: 'Horas mínimas de anticipación (solo cuando bookingCutoffMode = "hours"). Default: 24.',
+    minimum: 0,
+    maximum: 168,
+  })
+  @IsInt()
+  @Min(0)
+  @Max(168)
+  @IsOptional()
+  bookingCutoffHours?: number;
 }

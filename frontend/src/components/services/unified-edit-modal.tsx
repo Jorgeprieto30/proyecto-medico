@@ -38,6 +38,8 @@ const generalSchema = z.object({
   maxSpots:            z.coerce.number().min(1, 'Mínimo 1').max(500, 'Máximo 500'),
   namedSpots:          z.boolean(),
   spotLabel:           z.string().optional(),
+  bookingCutoffMode:   z.enum(['hours', 'day_before']),
+  bookingCutoffHours:  z.coerce.number().min(0).max(168),
 });
 type GeneralForm = z.infer<typeof generalSchema>;
 
@@ -101,6 +103,8 @@ export function UnifiedEditModal({
                 maxSpots: service.maxSpots,
                 namedSpots: !!service.spotLabel,
                 spotLabel: service.spotLabel ?? '',
+                bookingCutoffMode: service.bookingCutoffMode ?? 'hours',
+                bookingCutoffHours: service.bookingCutoffHours ?? 24,
               } : undefined}
             />
           )}
@@ -132,6 +136,7 @@ function GeneralTab({
   });
 
   const namedSpots = watch('namedSpots');
+  const cutoffMode = watch('bookingCutoffMode');
 
   const saveMutation = useMutation({
     mutationFn: (data: GeneralForm) => {
@@ -140,6 +145,8 @@ function GeneralTab({
       return servicesApi.update(serviceId, {
         ...rest,
         spotLabel: namedSpots ? (spotLabel || undefined) : undefined,
+        bookingCutoffMode: rest.bookingCutoffMode,
+        bookingCutoffHours: rest.bookingCutoffMode === 'hours' ? rest.bookingCutoffHours : 24,
       });
     },
     onSuccess: () => {
@@ -233,6 +240,70 @@ function GeneralTab({
             </div>
           )}
         </div>
+      </div>
+
+      {/* Booking cutoff rule */}
+      <div className="border rounded-lg p-4 bg-gray-50 space-y-3">
+        <div>
+          <p className="text-sm font-medium text-gray-700">Plazo de reserva</p>
+          <p className="text-xs text-gray-400 mt-0.5">¿Con cuánta anticipación se puede reservar?</p>
+        </div>
+        <Controller
+          name="bookingCutoffMode"
+          control={control}
+          render={({ field }) => (
+            <div className="flex gap-3">
+              <label className={`flex-1 flex items-start gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                field.value === 'hours' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'
+              }`}>
+                <input
+                  type="radio"
+                  value="hours"
+                  checked={field.value === 'hours'}
+                  onChange={() => field.onChange('hours')}
+                  className="mt-0.5"
+                />
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Horas de anticipación</p>
+                  <p className="text-xs text-gray-400">Cierra N horas antes del evento</p>
+                </div>
+              </label>
+              <label className={`flex-1 flex items-start gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                field.value === 'day_before' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'
+              }`}>
+                <input
+                  type="radio"
+                  value="day_before"
+                  checked={field.value === 'day_before'}
+                  onChange={() => field.onChange('day_before')}
+                  className="mt-0.5"
+                />
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Día anterior</p>
+                  <p className="text-xs text-gray-400">Cierra el día anterior a las 00:01</p>
+                </div>
+              </label>
+            </div>
+          )}
+        />
+        {cutoffMode === 'hours' && (
+          <div className="flex items-center gap-3">
+            <Input
+              type="number" min={0} max={168}
+              {...register('bookingCutoffHours')}
+              className="w-24"
+            />
+            <span className="text-sm text-gray-600">horas antes del evento</span>
+            {errors.bookingCutoffHours && (
+              <p className="text-xs text-red-500">{errors.bookingCutoffHours.message}</p>
+            )}
+          </div>
+        )}
+        {cutoffMode === 'day_before' && (
+          <p className="text-xs text-gray-500">
+            Ej: si el evento es el martes, el plazo cierra el lunes a las 00:01 (hora del servicio).
+          </p>
+        )}
       </div>
 
       <div className="flex justify-end pt-2">

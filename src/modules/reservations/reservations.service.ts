@@ -34,7 +34,7 @@ export class ReservationsService {
    * Usa pg_advisory_xact_lock para serializar acceso concurrente al mismo cupo/slot.
    */
   async create(dto: CreateReservationDto): Promise<Reservation> {
-    await this.servicesService.findOne(dto.service_id);
+    const service = await this.servicesService.findOne(dto.service_id);
 
     let slotStartDt: DateTime;
     try {
@@ -55,6 +55,25 @@ export class ReservationsService {
       throw new BadRequestException(
         `El bloque ${dto.slot_start} no existe o no está habilitado para el servicio ${dto.service_id}`,
       );
+    }
+
+    // Validar plazo de reserva (booking cutoff)
+    const now = DateTime.now().toUTC();
+    const slotStartLuxon = DateTime.fromJSDate(slotStartUtc, { zone: 'UTC' });
+    let cutoffDt: DateTime;
+    if (service.bookingCutoffMode === 'day_before') {
+      // El plazo cierra a las 00:01 del día anterior en la zona horaria del servicio
+      cutoffDt = slotStartLuxon
+        .setZone(service.timezone)
+        .startOf('day')
+        .minus({ days: 1 })
+        .plus({ minutes: 1 });
+    } else {
+      // hours: el plazo cierra N horas antes del inicio
+      cutoffDt = slotStartLuxon.minus({ hours: service.bookingCutoffHours });
+    }
+    if (now > cutoffDt.toUTC()) {
+      throw new BadRequestException('El plazo de reserva para este horario ha cerrado.');
     }
 
     // Validar spot_number si viene explícito
