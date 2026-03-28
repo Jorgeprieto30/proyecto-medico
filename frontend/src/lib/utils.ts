@@ -109,19 +109,23 @@ export function normalizeRut(rut: string): string {
   return clean;
 }
 
-/** Valida RUT chileno (acepta formatos: 12345678-9, 12.345.678-9, 123456789) */
+/** Valida RUT chileno. Normaliza primero, luego verifica formato y dígito verificador. */
 export function validateRut(rut: string): boolean {
-  const clean = rut.replace(/[.\-\s]/g, '').toUpperCase();
-  if (clean.length < 2) return false;
-  const body = clean.slice(0, -1);
-  const dv   = clean.slice(-1);
-  if (!/^\d+$/.test(body)) return false;
-  let sum = 0, mul = 2;
-  for (let i = body.length - 1; i >= 0; i--) {
-    sum += parseInt(body[i], 10) * mul;
-    mul = mul === 7 ? 2 : mul + 1;
+  const normalized = normalizeRut(rut);
+  // Formato esperado tras normalizar: 1234567-9 o 12345678-K
+  if (!/^\d{7,8}-[\dkK]$/i.test(normalized)) return false;
+
+  const [cuerpo, dvIngresado] = normalized.split('-');
+  const dv = dvIngresado.toUpperCase();
+
+  let suma = 0;
+  let multiplicador = 2;
+  for (let i = cuerpo.length - 1; i >= 0; i--) {
+    suma += parseInt(cuerpo[i], 10) * multiplicador;
+    multiplicador = multiplicador === 7 ? 2 : multiplicador + 1;
   }
-  const rem      = sum % 11;
-  const expected = rem === 0 ? '0' : rem === 1 ? 'K' : String(11 - rem);
-  return dv === expected;
+
+  const resto = suma % 11;
+  const dvEsperado = resto === 0 ? '0' : resto === 1 ? 'K' : String(11 - resto);
+  return dv === dvEsperado;
 }

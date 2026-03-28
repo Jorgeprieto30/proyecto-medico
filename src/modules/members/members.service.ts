@@ -24,6 +24,20 @@ function normalizeRut(rut: string): string {
   return clean;
 }
 
+function isValidRut(rut: string): boolean {
+  if (!/^\d{7,8}-[\dkK]$/i.test(rut)) return false;
+  const [cuerpo, dvIngresado] = rut.split('-');
+  const dv = dvIngresado.toUpperCase();
+  let suma = 0, multiplicador = 2;
+  for (let i = cuerpo.length - 1; i >= 0; i--) {
+    suma += parseInt(cuerpo[i], 10) * multiplicador;
+    multiplicador = multiplicador === 7 ? 2 : multiplicador + 1;
+  }
+  const resto = suma % 11;
+  const dvEsperado = resto === 0 ? '0' : resto === 1 ? 'K' : String(11 - resto);
+  return dv === dvEsperado;
+}
+
 @Injectable()
 export class MembersService {
   constructor(
@@ -38,11 +52,16 @@ export class MembersService {
     if (existing) throw new ConflictException('El email ya está registrado');
 
     const password_hash = await bcrypt.hash(dto.password, 12);
+    const normalizedRut = dto.rut ? normalizeRut(dto.rut) : null;
+    if (normalizedRut && !isValidRut(normalizedRut)) {
+      throw new BadRequestException('RUT inválido');
+    }
+
     const member = this.memberRepo.create({
       first_name: dto.first_name,
       last_name: dto.last_name,
       email: dto.email,
-      rut: dto.rut ? normalizeRut(dto.rut) : null,
+      rut: normalizedRut,
       birth_date: dto.birth_date ?? null,
       password_hash,
     });
@@ -79,7 +98,13 @@ export class MembersService {
     const member = await this.getProfile(id);
     if (dto.first_name !== undefined) member.first_name = dto.first_name;
     if (dto.last_name !== undefined) member.last_name = dto.last_name;
-    if (dto.rut !== undefined) member.rut = dto.rut ? normalizeRut(dto.rut) : null;
+    if (dto.rut !== undefined) {
+      const normalizedRut = dto.rut ? normalizeRut(dto.rut) : null;
+      if (normalizedRut && !isValidRut(normalizedRut)) {
+        throw new BadRequestException('RUT inválido');
+      }
+      member.rut = normalizedRut;
+    }
     if (dto.birth_date !== undefined) member.birth_date = dto.birth_date;
     return this.memberRepo.save(member);
   }
