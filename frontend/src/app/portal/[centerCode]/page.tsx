@@ -149,24 +149,31 @@ function BookingModal({ booking, onClose, onConfirm, memberProfile }: {
 
   const allDays = Array.from({ length: daysInMonth(year, month) }, (_, i) => toDateStr(year, month, i + 1));
 
-  // Load month availability
+  // Load month availability — 1 request per month instead of ~30
   useEffect(() => {
     if (step !== 'date') return;
     setMonthData(null);
     let cancelled = false;
     (async () => {
-      const results: Record<string, { available: number; capacity: number }> = {};
-      await Promise.all(allDays.map(async (d) => {
-        if (d < today) return;
-        try {
-          const raw = await apiFetch(`/public/availability?service_id=${booking.service.id}&date=${d}`);
-          const data = (raw as Slot[]).filter(sl => sl.bookable);
+      const startDate = allDays.find(d => d >= today) ?? allDays[0];
+      const endDate = allDays[allDays.length - 1];
+      if (startDate > endDate) { setMonthData({}); return; }
+      try {
+        const rangeData: Record<string, Slot[]> = await apiFetch(
+          `/public/availability/range?service_id=${booking.service.id}&start_date=${startDate}&end_date=${endDate}`,
+        );
+        const results: Record<string, { available: number; capacity: number }> = {};
+        for (const d of allDays) {
+          if (d < today) continue;
+          const data = (rangeData[d] ?? []).filter(sl => sl.bookable);
           const available = data.reduce((s: number, sl: Slot) => s + sl.available, 0);
           const capacity  = data.reduce((s: number, sl: Slot) => s + sl.capacity,  0);
           if (capacity > 0) results[d] = { available, capacity };
-        } catch { /* no slots */ }
-      }));
-      if (!cancelled) setMonthData(results);
+        }
+        if (!cancelled) setMonthData(results);
+      } catch {
+        if (!cancelled) setMonthData({});
+      }
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -492,20 +499,25 @@ function ServiceCard({ service, onBook, onQuickBook }: {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const found: UpcomingSlot[] = [];
-      for (let i = 0; i < 14 && found.length < 4; i++) {
-        const d = addDays(today, i);
-        try {
-          const slots: Slot[] = await apiFetch(`/public/availability?service_id=${service.id}&date=${d}`);
-          const bookable = slots.filter(s => s.bookable && s.available > 0);
-          for (const slot of bookable) {
+      try {
+        const endDate = addDays(today, 13);
+        const rangeData: Record<string, Slot[]> = await apiFetch(
+          `/public/availability/range?service_id=${service.id}&start_date=${today}&end_date=${endDate}`,
+        );
+        const found: UpcomingSlot[] = [];
+        // Iterate dates in order
+        for (let i = 0; i < 14 && found.length < 4; i++) {
+          const d = addDays(today, i);
+          const slots = (rangeData[d] ?? []).filter(s => s.bookable && s.available > 0);
+          for (const slot of slots) {
             if (found.length >= 4) break;
             found.push({ date: d, slot });
           }
-        } catch { /* skip */ }
-        if (cancelled) return;
+        }
+        if (!cancelled) setUpcoming(found);
+      } catch {
+        if (!cancelled) setUpcoming([]);
       }
-      if (!cancelled) setUpcoming(found);
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps

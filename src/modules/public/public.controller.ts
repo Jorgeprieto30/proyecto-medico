@@ -47,6 +47,19 @@ export class PublicController {
     return this.availabilityService.getAvailabilityByDate(serviceId, date);
   }
 
+  @Get('availability/range')
+  @ApiOperation({ summary: 'Consultar disponibilidad por rango de fechas (público, batch)' })
+  @ApiQuery({ name: 'service_id', type: String })
+  @ApiQuery({ name: 'start_date', type: String, example: '2026-03-29' })
+  @ApiQuery({ name: 'end_date', type: String, example: '2026-04-11' })
+  async getAvailabilityRange(
+    @Query('service_id', ParseUUIDPipe) serviceId: string,
+    @Query('start_date') startDate: string,
+    @Query('end_date') endDate: string,
+  ) {
+    return this.availabilityService.getAvailabilityByDateRange(serviceId, startDate, endDate);
+  }
+
   @Get('availability/spots')
   @ApiOperation({ summary: 'Consultar cupos numerados de una sesión (público)' })
   @ApiQuery({ name: 'service_id', type: String })
