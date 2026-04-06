@@ -1,9 +1,10 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { getSession, signOut } from 'next-auth/react';
+import { getSession, signOut, useSession } from 'next-auth/react';
 import { Users, Building2, Search } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PageSpinner } from '@/components/ui/spinner';
@@ -47,13 +48,24 @@ const STATUS_BADGE: Record<string, { label: string; variant: 'success' | 'warnin
 };
 
 export default function UsersPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [search, setSearch] = useState('');
+
+  const isOwner = (session?.user as any)?.role === 'owner';
+
+  useEffect(() => {
+    if (status !== 'loading' && !isOwner) {
+      router.replace('/reservations');
+    }
+  }, [status, isOwner, router]);
 
   const { data: users, isLoading } = useQuery<PlatformUser[]>({
     queryKey: ['platform-users'],
     queryFn: () => apiFetch('/users'),
   });
 
+  if (status === 'loading' || !isOwner) return <PageSpinner />;
   if (isLoading) return <PageSpinner />;
 
   const filtered = (users ?? []).filter((u) => {

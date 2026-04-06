@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Patch, Request } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Request, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { IsOptional, IsString, MaxLength, IsIn } from 'class-validator';
 import { UsersService } from './users.service';
+import { OwnerGuard } from '../auth/guards/owner.guard';
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -27,7 +28,8 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Listar todos los usuarios de la plataforma' })
+  @UseGuards(OwnerGuard)
+  @ApiOperation({ summary: 'Listar todos los usuarios de la plataforma (solo owner)' })
   findAll() {
     return this.usersService.findAll();
   }

@@ -15,11 +15,16 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const navItems = [
+const adminItems = [
   { href: '/reservations', label: 'Actividad', icon: ClipboardList },
   { href: '/classes', label: 'Eventos', icon: Dumbbell },
   { href: '/calendar', label: 'Calendario', icon: CalendarDays },
   { href: '/plans', label: 'Planes', icon: CreditCard },
+  { href: '/api-docs', label: 'API Docs', icon: BookOpen },
+  { href: '/settings', label: 'Configuración', icon: KeyRound },
+];
+
+const ownerItems = [
   { href: '/users', label: 'Usuarios', icon: Users },
   { href: '/api-docs', label: 'API Docs', icon: BookOpen },
   { href: '/settings', label: 'Configuración', icon: KeyRound },
@@ -28,6 +33,8 @@ const navItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const isOwner = (session?.user as any)?.role === 'owner';
+  const navItems = isOwner ? ownerItems : adminItems;
 
   return (
     <aside className="fixed inset-y-0 left-0 z-50 w-60 bg-[#0d1526] flex flex-col">
