@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "NestJS dev",
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": [".claude/start-dev.sh"],
+      "port": 3000
+    }
+  ]
+}
