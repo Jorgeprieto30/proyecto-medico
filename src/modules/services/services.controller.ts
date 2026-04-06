@@ -24,6 +24,7 @@ import { UpdateServiceDto } from './dto/update-service.dto';
 import { Service } from './entities/service.entity';
 import { SessionSpotOverridesService } from '../session-spot-overrides/session-spot-overrides.service';
 import { UpsertSessionOverrideDto } from '../session-spot-overrides/dto/upsert-override.dto';
+import { SubscriptionService } from '../subscription/subscription.service';
 import { DateTime } from 'luxon';
 
 @ApiTags('services')
@@ -33,13 +34,15 @@ export class ServicesController {
   constructor(
     private readonly servicesService: ServicesService,
     private readonly sessionOverridesService: SessionSpotOverridesService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
 
   @Post()
   @ApiOperation({ summary: 'Crear un nuevo servicio' })
   @ApiBody({ type: CreateServiceDto })
   @ApiResponse({ status: 201, type: Service })
-  create(@Body() dto: CreateServiceDto, @Req() req: any): Promise<Service> {
+  async create(@Body() dto: CreateServiceDto, @Req() req: any): Promise<Service> {
+    await this.subscriptionService.checkCanCreateService(req.user.id);
     return this.servicesService.create(dto, req.user.id);
   }
 

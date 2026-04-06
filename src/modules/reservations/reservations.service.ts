@@ -14,6 +14,7 @@ import { CreateReservationDto } from './dto/create-reservation.dto';
 import { ListReservationsQuery } from './dto/list-reservations.dto';
 import { AvailabilityService } from '../availability/availability.service';
 import { ServicesService } from '../services/services.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 const ACTIVE_STATUSES = [ReservationStatus.CONFIRMED, ReservationStatus.PENDING];
 
@@ -27,6 +28,7 @@ export class ReservationsService {
     @Inject(forwardRef(() => AvailabilityService))
     private readonly availabilityService: AvailabilityService,
     private readonly servicesService: ServicesService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
 
   /**
@@ -35,6 +37,10 @@ export class ReservationsService {
    */
   async create(dto: CreateReservationDto): Promise<Reservation> {
     const service = await this.servicesService.findOne(dto.service_id);
+
+    if (service.userId) {
+      await this.subscriptionService.checkCanCreateReservation(service.userId);
+    }
 
     let slotStartDt: DateTime;
     try {
@@ -89,7 +95,7 @@ export class ReservationsService {
       );
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const saved = await this.dataSource.transaction(async (manager) => {
       let spotNumber: number;
 
       if (dto.spot_number != null) {
@@ -161,6 +167,12 @@ export class ReservationsService {
 
       return manager.getRepository(Reservation).save(reservation);
     });
+
+    if (service.userId) {
+      await this.subscriptionService.incrementTrialCount(service.userId);
+    }
+
+    return saved;
   }
 
   async cancel(reservationId: number): Promise<Reservation> {

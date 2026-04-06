@@ -13,6 +13,7 @@ import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { MembersModule } from './modules/members/members.module';
 import { PublicModule } from './modules/public/public.module';
 import { SessionSpotOverridesModule } from './modules/session-spot-overrides/session-spot-overrides.module';
+import { SubscriptionModule } from './modules/subscription/subscription.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { SessionSpotOverridesModule } from './modules/session-spot-overrides/ses
     AuthModule,
     ApiKeysModule,
     SessionSpotOverridesModule,
+    SubscriptionModule,
     ServicesModule,
     ScheduleRulesModule,
     ScheduleBlocksModule,

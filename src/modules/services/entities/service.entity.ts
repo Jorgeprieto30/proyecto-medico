@@ -64,6 +64,14 @@ export class Service {
   @Column({ name: 'booking_cutoff_days', default: 1 })
   bookingCutoffDays: number;
 
+  @ApiProperty({ example: true, description: 'Si es false, el servicio no es visible en el portal de clientes' })
+  @Column({ name: 'is_visible', default: true })
+  isVisible: boolean;
+
+  @ApiProperty({ example: 5, description: 'Techo de cupos impuesto por el plan (5 base, 15 con addon)' })
+  @Column({ name: 'plan_spot_limit', default: 5 })
+  planSpotLimit: number;
+
   @ApiPropertyOptional({ nullable: true })
   @Column({ name: 'user_id', type: 'uuid', nullable: true })
   userId: string | null;

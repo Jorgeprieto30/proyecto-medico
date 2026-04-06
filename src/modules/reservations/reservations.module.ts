@@ -5,12 +5,14 @@ import { ReservationsService } from './reservations.service';
 import { ReservationsController } from './reservations.controller';
 import { AvailabilityModule } from '../availability/availability.module';
 import { ServicesModule } from '../services/services.module';
+import { SubscriptionModule } from '../subscription/subscription.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Reservation]),
     forwardRef(() => AvailabilityModule),
     ServicesModule,
+    SubscriptionModule,
   ],
   controllers: [ReservationsController],
   providers: [ReservationsService],
