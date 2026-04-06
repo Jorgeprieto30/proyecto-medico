@@ -7,10 +7,11 @@ import {
   BookOpen,
   CalendarDays,
   ClipboardList,
+  CreditCard,
   Dumbbell,
   KeyRound,
   LogOut,
-  Settings2,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -18,6 +19,8 @@ const navItems = [
   { href: '/reservations', label: 'Actividad', icon: ClipboardList },
   { href: '/classes', label: 'Eventos', icon: Dumbbell },
   { href: '/calendar', label: 'Calendario', icon: CalendarDays },
+  { href: '/plans', label: 'Planes', icon: CreditCard },
+  { href: '/users', label: 'Usuarios', icon: Users },
   { href: '/api-docs', label: 'API Docs', icon: BookOpen },
   { href: '/settings', label: 'Configuración', icon: KeyRound },
 ];

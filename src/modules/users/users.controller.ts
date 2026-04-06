@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Patch, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength, IsIn } from 'class-validator';
 import { UsersService } from './users.service';
 
 export class UpdateProfileDto {
@@ -15,11 +15,22 @@ export class UpdateProfileDto {
   center_code?: string;
 }
 
+export class UpdateSubscriptionDto {
+  @IsIn(['trial', 'active', 'past_due', 'cancelled'])
+  subscription_status: 'trial' | 'active' | 'past_due' | 'cancelled';
+}
+
 @ApiTags('users')
 @ApiBearerAuth()
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Listar todos los usuarios de la plataforma' })
+  findAll() {
+    return this.usersService.findAll();
+  }
 
   @Get('me')
   @ApiOperation({ summary: 'Obtener perfil del usuario autenticado' })
@@ -31,5 +42,11 @@ export class UsersController {
   @ApiOperation({ summary: 'Actualizar perfil del centro del usuario autenticado' })
   updateMe(@Request() req: any, @Body() dto: UpdateProfileDto) {
     return this.usersService.updateProfile(req.user.id, dto);
+  }
+
+  @Patch('me/plan')
+  @ApiOperation({ summary: 'Actualizar estado de suscripción del usuario autenticado' })
+  updatePlan(@Request() req: any, @Body() dto: UpdateSubscriptionDto) {
+    return this.usersService.updateSubscriptionStatus(req.user.id, dto.subscription_status);
   }
 }

@@ -400,13 +400,15 @@ export default function ApiDocsPage() {
           </p>
         </div>
         <a
-          href="https://proyecto-medico-production-dc07.up.railway.app/api/docs"
+          href="http://localhost:3000/api/docs"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 border border-blue-200 rounded-lg px-3 py-2 hover:bg-blue-50 transition-colors"
+          title="Solo disponible en desarrollo local"
+          className="inline-flex items-center gap-2 text-sm text-gray-400 border border-gray-200 rounded-lg px-3 py-2 cursor-default select-none opacity-50"
+          onClick={(e) => e.preventDefault()}
         >
           <ExternalLink className="h-4 w-4" />
-          Swagger UI
+          Swagger UI (solo local)
         </a>
       </div>
 

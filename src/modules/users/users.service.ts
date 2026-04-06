@@ -63,6 +63,26 @@ export class UsersService {
     return this.userRepo.findOne({ where: { center_code: code } });
   }
 
+  async findAll(): Promise<Partial<User>[]> {
+    return this.userRepo.find({
+      select: ['id', 'name', 'email', 'center_name', 'center_code', 'subscription_status', 'trial_reservation_count', 'created_at'],
+      order: { created_at: 'DESC' },
+    });
+  }
+
+  async updateSubscriptionStatus(
+    id: string,
+    status: 'trial' | 'active' | 'past_due' | 'cancelled',
+  ): Promise<User> {
+    const user = await this.findById(id);
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    user.subscription_status = status;
+    if (status === 'active') {
+      user.past_due_since = null;
+    }
+    return this.userRepo.save(user);
+  }
+
   async searchCenters(q: string): Promise<User[]> {
     return this.userRepo.find({
       where: [
