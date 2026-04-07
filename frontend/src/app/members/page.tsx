@@ -33,8 +33,9 @@ interface Visitor {
   last_name: string;
   email: string;
   rut: string | null;
-  first_visited_at: string;
-  last_visited_at: string;
+  first_reservation_at: string;
+  last_reservation_at: string;
+  total_reservations: number;
 }
 
 export default function MembersPage() {
@@ -94,13 +95,13 @@ export default function MembersPage() {
             <div className="px-6 py-12 text-center text-gray-400 text-sm">
               {search
                 ? 'Sin resultados para tu búsqueda.'
-                : 'Ningún usuario ha visitado tu portal aún. Comparte el enlace de tu centro para que puedan registrarse.'}
+                : 'Ningún usuario ha hecho una reserva en tu centro aún.'}
             </div>
           ) : (
             <table className="w-full text-sm">
               <thead className="border-t border-b bg-gray-50">
                 <tr>
-                  {['Nombre', 'Email', 'RUT', 'Primera visita', 'Última visita'].map((h) => (
+                  {['Nombre', 'Email', 'RUT', 'Primera reserva', 'Última reserva', 'Total'].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-medium text-gray-500 text-xs uppercase tracking-wide">
                       {h}
                     </th>
@@ -118,10 +119,13 @@ export default function MembersPage() {
                       {v.rut ?? <span className="text-gray-300 font-sans italic">—</span>}
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-xs">
-                      {new Date(v.first_visited_at).toLocaleDateString('es-CL')}
+                      {new Date(v.first_reservation_at).toLocaleDateString('es-CL')}
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-xs">
-                      {new Date(v.last_visited_at).toLocaleDateString('es-CL')}
+                      {new Date(v.last_reservation_at).toLocaleDateString('es-CL')}
+                    </td>
+                    <td className="px-4 py-3 text-center text-xs font-medium text-blue-600">
+                      {v.total_reservations}
                     </td>
                   </tr>
                 ))}

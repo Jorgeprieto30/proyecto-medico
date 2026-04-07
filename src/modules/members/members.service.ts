@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
@@ -50,6 +50,7 @@ export class MembersService {
     private readonly memberRepo: Repository<Member>,
     @InjectRepository(MemberCenterVisit)
     private readonly visitRepo: Repository<MemberCenterVisit>,
+    private readonly dataSource: DataSource,
     private readonly jwtService: JwtService,
     private readonly mailService: MailService,
   ) {}
@@ -69,7 +70,8 @@ export class MembersService {
   }
 
   /**
-   * Retorna todos los miembros que alguna vez visitaron el centro del admin.
+   * Retorna todos los miembros que alguna vez reservaron en el centro del admin.
+   * Cubre datos históricos y futuras reservas automáticamente.
    */
   async findMyVisitors(centerUserId: string): Promise<{
     id: string;
@@ -77,23 +79,31 @@ export class MembersService {
     last_name: string;
     email: string;
     rut: string | null;
-    first_visited_at: Date;
-    last_visited_at: Date;
+    first_reservation_at: Date;
+    last_reservation_at: Date;
+    total_reservations: number;
   }[]> {
-    const visits = await this.visitRepo.find({
-      where: { centerUserId },
-      relations: ['member'],
-      order: { last_visited_at: 'DESC' },
-    });
-    return visits.map((v) => ({
-      id: v.member.id,
-      first_name: v.member.first_name,
-      last_name: v.member.last_name,
-      email: v.member.email,
-      rut: v.member.rut,
-      first_visited_at: v.first_visited_at,
-      last_visited_at: v.last_visited_at,
-    }));
+    return this.dataSource.query(
+      `
+      SELECT
+        m.id,
+        m.first_name,
+        m.last_name,
+        m.email,
+        m.rut,
+        MIN(r.created_at) AS first_reservation_at,
+        MAX(r.created_at) AS last_reservation_at,
+        COUNT(r.id)::int   AS total_reservations
+      FROM reservations r
+      JOIN services s ON r.service_id = s.id
+      JOIN members  m ON r.member_id  = m.id
+      WHERE s.user_id    = $1
+        AND r.member_id IS NOT NULL
+      GROUP BY m.id, m.first_name, m.last_name, m.email, m.rut
+      ORDER BY last_reservation_at DESC
+      `,
+      [centerUserId],
+    );
   }
 
   async register(dto: RegisterMemberDto) {
