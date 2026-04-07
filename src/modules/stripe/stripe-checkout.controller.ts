@@ -57,12 +57,12 @@ export class StripeCheckoutController {
 
     const priceEnvVar =
       dto.plan === 'starter'
-        ? process.env.STRIPE_PRICE_BASICO
+        ? process.env.STRIPE_PRICE_BASIC
         : process.env.STRIPE_PRICE_PRO;
 
     if (!priceEnvVar) {
       throw new BadRequestException(
-        `Variable de entorno STRIPE_PRICE_${dto.plan === 'starter' ? 'BASICO' : 'PRO'} no configurada`,
+        `Variable de entorno STRIPE_PRICE_${dto.plan === 'starter' ? 'BASIC' : 'PRO'} no configurada`,
       );
     }
 

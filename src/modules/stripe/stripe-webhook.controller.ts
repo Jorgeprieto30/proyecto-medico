@@ -19,7 +19,7 @@ import { Service } from '../services/entities/service.entity';
 
 /** Mapeo de Stripe Price IDs → subscription_status local */
 function priceIdToStatus(priceId: string): 'starter' | 'active' | null {
-  if (priceId === process.env.STRIPE_PRICE_BASICO) return 'starter';
+  if (priceId === process.env.STRIPE_PRICE_BASIC) return 'starter';
   if (priceId === process.env.STRIPE_PRICE_PRO) return 'active';
   return null;
 }
