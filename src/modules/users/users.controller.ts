@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Patch, Request, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength, IsIn } from 'class-validator';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { UsersService } from './users.service';
 import { OwnerGuard } from '../auth/guards/owner.guard';
 
@@ -14,11 +14,6 @@ export class UpdateProfileDto {
   @IsString()
   @MaxLength(100)
   center_code?: string;
-}
-
-export class UpdateSubscriptionDto {
-  @IsIn(['trial', 'starter', 'active', 'past_due', 'cancelled'])
-  subscription_status: 'trial' | 'starter' | 'active' | 'past_due' | 'cancelled';
 }
 
 @ApiTags('users')
@@ -45,10 +40,7 @@ export class UsersController {
   updateMe(@Request() req: any, @Body() dto: UpdateProfileDto) {
     return this.usersService.updateProfile(req.user.id, dto);
   }
-
-  @Patch('me/plan')
-  @ApiOperation({ summary: 'Actualizar estado de suscripción del usuario autenticado' })
-  updatePlan(@Request() req: any, @Body() dto: UpdateSubscriptionDto) {
-    return this.usersService.updateSubscriptionStatus(req.user.id, dto.subscription_status);
-  }
+  // PATCH /users/me/plan fue eliminado intencionalmente.
+  // Los cambios de plan se gestionan exclusivamente a través de Stripe Webhooks
+  // (stripe-webhook.controller.ts) para garantizar que solo pagos reales activan planes.
 }
