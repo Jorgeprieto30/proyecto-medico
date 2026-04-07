@@ -30,5 +30,5 @@ Thumbs.db
 # TypeScript build cache
 frontend/tsconfig.tsbuildinfo
 
-# Claude local settings
-.claude/settings.local.json
+# Claude Code (configuración local, worktrees y memoria)
+.claude/
