@@ -1,9 +1,11 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { getSession, signOut } from 'next-auth/react';
 import { toast } from 'sonner';
-import { Check, Zap, Rocket, Star, CreditCard, AlertTriangle } from 'lucide-react';
+import { Check, Zap, Rocket, Star, CreditCard, AlertTriangle, Settings } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,14 +36,15 @@ interface UserProfile {
   trial_reservation_count: number;
   name: string;
   email: string;
+  current_period_end: string | null;
 }
 
 const STATUS_LABELS: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'muted' }> = {
-  trial: { label: 'Trial', variant: 'warning' },
-  starter: { label: 'Básico', variant: 'success' },
-  active: { label: 'Pro', variant: 'success' },
-  past_due: { label: 'Pago vencido', variant: 'danger' },
-  cancelled: { label: 'Cancelado', variant: 'muted' },
+  trial:     { label: 'Trial',         variant: 'warning' },
+  starter:   { label: 'Básico',        variant: 'success' },
+  active:    { label: 'Pro',           variant: 'success' },
+  past_due:  { label: 'Pago vencido',  variant: 'danger'  },
+  cancelled: { label: 'Cancelado',     variant: 'muted'   },
 };
 
 const plans = [
@@ -60,6 +63,7 @@ const plans = [
     color: 'text-yellow-500',
     bg: 'bg-yellow-50 border-yellow-200',
     targetStatus: 'trial' as const,
+    stripePlan: null,
   },
   {
     id: 'starter',
@@ -69,6 +73,7 @@ const plans = [
     features: [
       'Hasta 3 eventos activos',
       'Hasta 20 cupos por evento',
+      'Reservas ilimitadas',
       'Portal público de reservas',
       'API key incluida',
     ],
@@ -76,6 +81,7 @@ const plans = [
     color: 'text-purple-500',
     bg: 'bg-purple-50 border-purple-200',
     targetStatus: 'starter' as const,
+    stripePlan: 'starter' as const,
   },
   {
     id: 'pro',
@@ -85,7 +91,7 @@ const plans = [
     features: [
       'Hasta 10 eventos activos',
       'Hasta 50 cupos por evento',
-      'Portal público de reservas',
+      'Reservas ilimitadas',
       'Múltiples API keys',
       'Soporte prioritario',
     ],
@@ -94,26 +100,51 @@ const plans = [
     bg: 'bg-blue-50 border-blue-200',
     targetStatus: 'active' as const,
     highlighted: true,
+    stripePlan: 'active' as const,
   },
 ];
 
 export default function PlansPage() {
-  const qc = useQueryClient();
+  const searchParams = useSearchParams();
+
+  // Mostrar toast según redirect de Stripe
+  useEffect(() => {
+    if (searchParams.get('success') === '1') {
+      toast.success('¡Pago exitoso! Tu plan se activará en segundos.');
+    }
+    if (searchParams.get('cancelled') === '1') {
+      toast.info('Pago cancelado. Puedes intentarlo cuando quieras.');
+    }
+  }, [searchParams]);
 
   const { data: user, isLoading } = useQuery<UserProfile>({
     queryKey: ['user-me'],
     queryFn: () => apiFetch('/users/me'),
   });
 
-  const planMutation = useMutation({
-    mutationFn: (status: 'trial' | 'starter' | 'active') =>
-      apiFetch('/users/me/plan', {
-        method: 'PATCH',
-        body: JSON.stringify({ subscription_status: status }),
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['user-me'] });
-      toast.success('Plan actualizado correctamente');
+  // Redirige a Stripe Checkout
+  const checkoutMutation = useMutation({
+    mutationFn: async (plan: 'starter' | 'active') => {
+      const data = await apiFetch('/stripe/checkout', {
+        method: 'POST',
+        body: JSON.stringify({ plan }),
+      });
+      return data.url as string;
+    },
+    onSuccess: (url) => {
+      window.location.href = url;
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Redirige al Portal de cliente (gestionar/cancelar/cambiar tarjeta)
+  const portalMutation = useMutation({
+    mutationFn: async () => {
+      const data = await apiFetch('/stripe/portal', { method: 'POST' });
+      return data.url as string;
+    },
+    onSuccess: (url) => {
+      window.location.href = url;
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -122,6 +153,8 @@ export default function PlansPage() {
 
   const currentStatus = user?.subscription_status ?? 'trial';
   const statusInfo = STATUS_LABELS[currentStatus];
+  const isPaid = currentStatus === 'starter' || currentStatus === 'active';
+  const isLoading2 = checkoutMutation.isPending || portalMutation.isPending;
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -133,7 +166,7 @@ export default function PlansPage() {
       {/* Estado actual */}
       <Card>
         <CardContent className="pt-5">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <CreditCard className="h-5 w-5 text-gray-500" />
               <div>
@@ -141,12 +174,32 @@ export default function PlansPage() {
                 <p className="text-xs text-gray-400">{user?.email}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+
               {currentStatus === 'trial' && (
                 <span className="text-xs text-gray-400">
                   {user?.trial_reservation_count ?? 0}/3 reservas usadas
                 </span>
+              )}
+
+              {user?.current_period_end && isPaid && (
+                <span className="text-xs text-gray-400">
+                  Renueva el {new Date(user.current_period_end).toLocaleDateString('es-CL')}
+                </span>
+              )}
+
+              {/* Botón de gestión para suscriptores activos */}
+              {(isPaid || currentStatus === 'past_due') && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => portalMutation.mutate()}
+                  disabled={isLoading2}
+                >
+                  <Settings className="h-3.5 w-3.5 mr-1.5" />
+                  {portalMutation.isPending ? 'Abriendo...' : 'Gestionar suscripción'}
+                </Button>
               )}
             </div>
           </div>
@@ -156,7 +209,7 @@ export default function PlansPage() {
               <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
               <p className="text-sm text-red-700">
                 {currentStatus === 'past_due'
-                  ? 'Tu pago está vencido. Tienes 5 días de gracia antes de que tus servicios sean ocultados.'
+                  ? 'Tu pago está vencido. Tienes 5 días de gracia antes de que tus servicios sean ocultados. Actualiza tu método de pago.'
                   : 'Tu suscripción está cancelada. Contrata un plan para reactivar tus servicios.'}
               </p>
             </div>
@@ -173,13 +226,7 @@ export default function PlansPage() {
           const planStatusOrder = planOrder[plan.targetStatus];
           const isCurrent = currentStatus === plan.targetStatus;
           const isUpgrade = planStatusOrder > currentOrder;
-          const isDowngrade = planStatusOrder < currentOrder;
-
-          const ctaLabel: Record<string, string> = {
-            trial: 'Contratar Básico',
-            starter: 'Contratar Básico',
-            active: 'Contratar Pro',
-          };
+          const isDowngrade = planStatusOrder < currentOrder && planStatusOrder > 0;
 
           return (
             <div
@@ -199,7 +246,11 @@ export default function PlansPage() {
               )}
 
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${plan.highlighted ? 'bg-blue-100' : plan.targetStatus === 'starter' ? 'bg-purple-100' : 'bg-gray-100'}`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                  plan.highlighted ? 'bg-blue-100'
+                  : plan.targetStatus === 'starter' ? 'bg-purple-100'
+                  : 'bg-gray-100'
+                }`}>
                   <Icon className={`h-5 w-5 ${plan.color}`} />
                 </div>
                 <div>
@@ -227,22 +278,24 @@ export default function PlansPage() {
                     <Check className="h-4 w-4" />
                     Plan actual
                   </div>
-                ) : isUpgrade ? (
+                ) : isUpgrade && plan.stripePlan ? (
+                  // Upgrade → Stripe Checkout
                   <Button
                     className="w-full"
-                    onClick={() => planMutation.mutate(plan.targetStatus as 'starter' | 'active')}
-                    disabled={planMutation.isPending}
+                    onClick={() => checkoutMutation.mutate(plan.stripePlan!)}
+                    disabled={isLoading2}
                   >
-                    {planMutation.isPending ? 'Procesando...' : ctaLabel[plan.targetStatus]}
+                    {checkoutMutation.isPending ? 'Redirigiendo...' : `Contratar ${plan.name}`}
                   </Button>
                 ) : isDowngrade ? (
+                  // Downgrade → Portal de Stripe
                   <Button
                     variant="outline"
                     className="w-full"
-                    onClick={() => planMutation.mutate(plan.targetStatus as 'trial' | 'starter')}
-                    disabled={planMutation.isPending}
+                    onClick={() => portalMutation.mutate()}
+                    disabled={isLoading2}
                   >
-                    {planMutation.isPending ? 'Procesando...' : `Cambiar a ${plan.name}`}
+                    {portalMutation.isPending ? 'Abriendo...' : `Cambiar a ${plan.name}`}
                   </Button>
                 ) : null}
               </div>
@@ -268,13 +321,13 @@ export default function PlansPage() {
             </thead>
             <tbody className="divide-y text-gray-700">
               {[
-                ['Precio', 'Gratis', '$30 / mes', '$39 / mes'],
-                ['Eventos activos', '1', '3', '10'],
-                ['Cupos por evento', '—', '20', '50'],
-                ['Reservas totales', '3', 'Ilimitadas', 'Ilimitadas'],
-                ['Portal de reservas', '✓', '✓', '✓'],
-                ['API keys', '1', '1', 'Múltiples'],
-                ['Soporte', 'Comunidad', 'Email', 'Prioritario'],
+                ['Precio',           'Gratis',       '$30 / mes',   '$39 / mes'  ],
+                ['Eventos activos',  '1',            '3',           '10'         ],
+                ['Cupos por evento', '—',            '20',          '50'         ],
+                ['Reservas totales', '3',            'Ilimitadas',  'Ilimitadas' ],
+                ['Portal de reservas','✓',           '✓',           '✓'          ],
+                ['API keys',         '1',            '1',           'Múltiples'  ],
+                ['Soporte',          'Comunidad',    'Email',       'Prioritario'],
               ].map(([feat, trial, starter, pro]) => (
                 <tr key={feat} className="hover:bg-gray-50">
                   <td className="px-5 py-3 font-medium">{feat}</td>
