@@ -37,6 +37,7 @@ interface UserProfile {
   name: string;
   email: string;
   current_period_end: string | null;
+  stripe_subscription_id: string | null;
 }
 
 const STATUS_LABELS: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'muted' }> = {
@@ -156,6 +157,7 @@ export default function PlansPage() {
   const currentStatus = user?.subscription_status ?? 'trial';
   const statusInfo = STATUS_LABELS[currentStatus];
   const isPaid = currentStatus === 'starter' || currentStatus === 'active';
+  const hasStripeSubscription = !!user?.stripe_subscription_id;
   const isLoading2 = checkoutMutation.isPending || portalMutation.isPending;
 
   return (
@@ -194,8 +196,8 @@ export default function PlansPage() {
                 </span>
               )}
 
-              {/* Botón de gestión para suscriptores activos */}
-              {(isPaid || currentStatus === 'past_due') && (
+              {/* Botón de gestión para suscriptores con Stripe activo */}
+              {(isPaid || currentStatus === 'past_due') && hasStripeSubscription && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -292,8 +294,8 @@ export default function PlansPage() {
                   >
                     {checkoutMutation.isPending ? 'Redirigiendo...' : `Contratar ${plan.name}`}
                   </Button>
-                ) : isDowngrade ? (
-                  // Downgrade → Portal de Stripe
+                ) : isDowngrade && hasStripeSubscription ? (
+                  // Downgrade → Portal de Stripe (solo si tiene suscripción real)
                   <Button
                     variant="outline"
                     className="w-full"
