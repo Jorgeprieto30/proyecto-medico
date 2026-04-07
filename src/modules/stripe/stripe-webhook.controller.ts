@@ -227,6 +227,16 @@ export class StripeWebhookController {
       return;
     }
 
+    // Extraer subscription ID: API ≥ 2026-03-25 lo mueve a invoice.parent.subscription_details
+    const subscriptionId =
+      (invoice.subscription as string | null) ??
+      ((invoice as any).parent?.subscription_details?.subscription as string | undefined);
+
+    // Ignorar facturas one-off (sin suscripción asociada)
+    if (!subscriptionId) {
+      return;
+    }
+
     const user = await this.userRepo.findOne({
       where: { stripe_customer_id: customerId },
     });
@@ -235,9 +245,7 @@ export class StripeWebhookController {
       return;
     }
 
-    const sub = await this.stripeService.retrieveSubscription(
-      invoice.subscription as string,
-    );
+    const sub = await this.stripeService.retrieveSubscription(subscriptionId);
 
     // Parche #2: verificar estado en Stripe antes de actualizar.
     // Si la suscripción en Stripe NO está activa (fue cancelada, expiró, etc.),

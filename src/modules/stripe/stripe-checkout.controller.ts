@@ -98,17 +98,20 @@ export class StripeCheckoutController {
         .execute();
 
       if (result.affected === 0) {
-        // Otro request ganó la carrera. Eliminamos el Customer que acabamos de crear
-        // para no dejar huérfanos en Stripe, y recargamos el usuario con el ID ganador.
-        this.logger.warn(
-          `Race condition detectada en createCustomer para userId=${user.id}. Eliminando duplicado ${newCustomerId}.`,
-        );
-        await this.stripeService.deleteCustomer(newCustomerId);
+        // Otro request ganó la carrera. Recargamos el usuario para obtener el ID ganador.
         user = await this.userRepo.findOne({ where: { id: req.user.id } });
         if (!user?.stripe_customer_id) {
           throw new InternalServerErrorException(
             'Error al asignar Customer de Stripe. Intenta de nuevo.',
           );
+        }
+        // Solo eliminamos el customer duplicado si es distinto al del ganador.
+        // Si Stripe devolvió el mismo ID (por idempotency key), el ganador ya lo guardó.
+        if (newCustomerId !== user.stripe_customer_id) {
+          this.logger.warn(
+            `Race condition detectada en createCustomer para userId=${user.id}. Eliminando duplicado ${newCustomerId}.`,
+          );
+          await this.stripeService.deleteCustomer(newCustomerId);
         }
       } else {
         user.stripe_customer_id = newCustomerId;
