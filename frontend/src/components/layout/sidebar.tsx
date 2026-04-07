@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import {
   BookOpen,
+  Building2,
   CalendarDays,
   ClipboardList,
   CreditCard,
@@ -26,7 +27,11 @@ const adminItems = [
 ];
 
 const ownerItems = [
-  { href: '/users', label: 'Usuarios', icon: Users },
+  { href: '/reservations', label: 'Actividad', icon: ClipboardList },
+  { href: '/classes', label: 'Eventos', icon: Dumbbell },
+  { href: '/calendar', label: 'Calendario', icon: CalendarDays },
+  { href: '/members', label: 'Mis usuarios', icon: Users },
+  { href: '/users', label: 'Todos los centros', icon: Building2 },
   { href: '/api-docs', label: 'API Docs', icon: BookOpen },
   { href: '/settings', label: 'Configuración', icon: KeyRound },
 ];
