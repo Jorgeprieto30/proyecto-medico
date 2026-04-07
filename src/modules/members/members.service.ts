@@ -12,6 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { Member } from './entities/member.entity';
+import { MemberCenterVisit } from './entities/member-center-visit.entity';
 import { MailService } from '../mail/mail.service';
 import { RegisterMemberDto } from './dto/register-member.dto';
 import { LoginMemberDto } from './dto/login-member.dto';
@@ -47,9 +48,53 @@ export class MembersService {
   constructor(
     @InjectRepository(Member)
     private readonly memberRepo: Repository<Member>,
+    @InjectRepository(MemberCenterVisit)
+    private readonly visitRepo: Repository<MemberCenterVisit>,
     private readonly jwtService: JwtService,
     private readonly mailService: MailService,
   ) {}
+
+  /**
+   * Registra o actualiza la visita de un miembro a un centro.
+   * Upsert: si ya existe el par (member, center) solo actualiza last_visited_at.
+   */
+  async recordVisit(memberId: string, centerUserId: string): Promise<void> {
+    await this.visitRepo
+      .createQueryBuilder()
+      .insert()
+      .into(MemberCenterVisit)
+      .values({ memberId, centerUserId })
+      .orUpdate(['last_visited_at'], ['member_id', 'center_user_id'])
+      .execute();
+  }
+
+  /**
+   * Retorna todos los miembros que alguna vez visitaron el centro del admin.
+   */
+  async findMyVisitors(centerUserId: string): Promise<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    rut: string | null;
+    first_visited_at: Date;
+    last_visited_at: Date;
+  }[]> {
+    const visits = await this.visitRepo.find({
+      where: { centerUserId },
+      relations: ['member'],
+      order: { last_visited_at: 'DESC' },
+    });
+    return visits.map((v) => ({
+      id: v.member.id,
+      first_name: v.member.first_name,
+      last_name: v.member.last_name,
+      email: v.member.email,
+      rut: v.member.rut,
+      first_visited_at: v.first_visited_at,
+      last_visited_at: v.last_visited_at,
+    }));
+  }
 
   async register(dto: RegisterMemberDto) {
     const normalizedRut = dto.rut ? normalizeRut(dto.rut) : null;

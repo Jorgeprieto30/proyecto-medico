@@ -19,6 +19,7 @@ const adminItems = [
   { href: '/reservations', label: 'Actividad', icon: ClipboardList },
   { href: '/classes', label: 'Eventos', icon: Dumbbell },
   { href: '/calendar', label: 'Calendario', icon: CalendarDays },
+  { href: '/members', label: 'Mis usuarios', icon: Users },
   { href: '/plans', label: 'Planes', icon: CreditCard },
   { href: '/api-docs', label: 'API Docs', icon: BookOpen },
   { href: '/settings', label: 'Configuración', icon: KeyRound },

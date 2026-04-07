@@ -10,9 +10,11 @@ import {
   Patch,
   Query,
   Req,
+  Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import { IsString } from 'class-validator';
 import { MembersService } from './members.service';
 import { RegisterMemberDto } from './dto/register-member.dto';
 import { LoginMemberDto } from './dto/login-member.dto';
@@ -28,6 +30,12 @@ import { ReservationsService } from '../reservations/reservations.service';
 import { CreateReservationDto } from '../reservations/dto/create-reservation.dto';
 import { MailService } from '../mail/mail.service';
 import { ServicesService } from '../services/services.service';
+import { UsersService } from '../users/users.service';
+
+class RecordVisitDto {
+  @IsString()
+  center_code: string;
+}
 
 @ApiTags('members')
 @Controller('members')
@@ -37,7 +45,31 @@ export class MembersController {
     private readonly reservationsService: ReservationsService,
     private readonly mailService: MailService,
     private readonly servicesService: ServicesService,
+    private readonly usersService: UsersService,
   ) {}
+
+  // ─── Admin: ver visitantes de su centro ────────────────────────────────────
+
+  @Get('my-visitors')
+  @ApiOperation({ summary: '[Admin] Listar miembros que visitaron este centro' })
+  getMyVisitors(@Request() req: any) {
+    return this.membersService.findMyVisitors(req.user.id);
+  }
+
+  // ─── Member: registrar visita a un centro ──────────────────────────────────
+
+  @MemberAuth()
+  @Post('visit')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Registrar visita de un miembro a un centro' })
+  async recordVisit(@Member() member: MemberEntity, @Body() dto: RecordVisitDto) {
+    const center = await this.usersService.findByCenterCode(dto.center_code);
+    if (!center) return { ok: false };
+    await this.membersService.recordVisit(member.id, center.id);
+    return { ok: true };
+  }
+
+  // ─── Admin: buscar miembros ─────────────────────────────────────────────────
 
   @Get('search')
   @ApiOperation({ summary: '[Admin] Buscar miembros por nombre, RUT o email' })

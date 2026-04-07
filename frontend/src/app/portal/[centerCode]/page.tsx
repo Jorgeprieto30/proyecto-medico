@@ -610,6 +610,16 @@ export default function CenterPage() {
         if (!exact) { setCenter(null); setLoading(false); return; }
         setCenter(exact);
         setServices(await apiFetch(`/public/centers/${centerCode}/services`));
+
+        // Registrar visita si el miembro está logueado (fire-and-forget)
+        const token = getMemberToken();
+        if (token && centerCode) {
+          fetch(`${BASE}/members/visit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ center_code: centerCode }),
+          }).catch(() => { /* non-critical */ });
+        }
       } catch { setCenter(null); }
       finally { setLoading(false); }
     }
