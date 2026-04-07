@@ -14,6 +14,7 @@ import { MembersModule } from './modules/members/members.module';
 import { PublicModule } from './modules/public/public.module';
 import { SessionSpotOverridesModule } from './modules/session-spot-overrides/session-spot-overrides.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
+import { StripeModule } from './modules/stripe/stripe.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { SubscriptionModule } from './modules/subscription/subscription.module';
     ApiKeysModule,
     SessionSpotOverridesModule,
     SubscriptionModule,
+    StripeModule,
     ServicesModule,
     ScheduleRulesModule,
     ScheduleBlocksModule,

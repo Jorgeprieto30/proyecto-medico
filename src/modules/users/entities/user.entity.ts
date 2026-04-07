@@ -59,6 +59,12 @@ export class User {
   @Column({ name: 'past_due_since', type: 'timestamptz', nullable: true })
   past_due_since: Date | null;
 
+  @Column({ name: 'current_period_end', type: 'timestamptz', nullable: true })
+  current_period_end: Date | null;
+
+  @Column({ name: 'stripe_price_id', type: 'varchar', length: 100, nullable: true })
+  stripe_price_id: string | null;
+
   @CreateDateColumn()
   created_at: Date;
 

@@ -8,7 +8,11 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    // rawBody: true es necesario para que stripe.webhooks.constructEvent pueda
+    // verificar la firma HMAC del webhook. Sin esto req.rawBody es undefined.
+    rawBody: true,
+  });
 
   // ── Seguridad: headers HTTP con Helmet ─────────────────────────────────────
   app.use(helmet());
