@@ -43,6 +43,9 @@ export class ServicesController {
   @ApiResponse({ status: 201, type: Service })
   async create(@Body() dto: CreateServiceDto, @Req() req: any): Promise<Service> {
     await this.subscriptionService.checkCanCreateService(req.user.id);
+    if (dto.maxSpots !== undefined) {
+      await this.subscriptionService.checkServiceSpotLimit(req.user.id, dto.maxSpots);
+    }
     return this.servicesService.create(dto, req.user.id);
   }
 
@@ -67,11 +70,14 @@ export class ServicesController {
   @ApiParam({ name: 'id', type: String })
   @ApiBody({ type: UpdateServiceDto })
   @ApiResponse({ status: 200, type: Service })
-  update(
+  async update(
     @Param('id') id: string,
     @Body() dto: UpdateServiceDto,
     @Req() req: any,
   ): Promise<Service> {
+    if (dto.maxSpots !== undefined) {
+      await this.subscriptionService.checkServiceSpotLimit(req.user.id, dto.maxSpots);
+    }
     return this.servicesService.update(id, dto, req.user.id);
   }
 

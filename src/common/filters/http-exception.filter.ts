@@ -44,12 +44,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
         : exception.message;
     }
 
+    // En producción se omiten los query params para no exponer datos sensibles en logs/responses
+    const path = process.env.NODE_ENV === 'production' ? request.path : request.url;
+
     response.status(status).json({
       statusCode: status,
       error,
       message,
       timestamp: new Date().toISOString(),
-      path: request.url,
+      path,
     });
   }
 }

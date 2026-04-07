@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -42,14 +43,15 @@ export class ReservationsController {
 
   @Get()
   @ApiOperation({ summary: 'Listar reservas de un servicio' })
-  @ApiQuery({ name: 'service_id', type: String })
+  @ApiQuery({ name: 'service_id', type: String, required: true })
   @ApiQuery({ name: 'date', type: String, required: false, example: '2026-03-20' })
   @ApiQuery({ name: 'status', enum: ReservationStatus, required: false })
   @ApiResponse({ status: 200, type: [Reservation] })
   async findAll(@Query() query: ListReservationsQuery, @Req() req: any): Promise<Reservation[]> {
-    if (query.service_id) {
-      await this.servicesService.findOneForUser(query.service_id, req.user.id);
+    if (!query.service_id) {
+      throw new BadRequestException('service_id es requerido');
     }
+    await this.servicesService.findOneForUser(query.service_id, req.user.id);
     return this.reservationsService.findAll(query);
   }
 

@@ -72,12 +72,12 @@ export class UsersService {
 
   async updateSubscriptionStatus(
     id: string,
-    status: 'trial' | 'active' | 'past_due' | 'cancelled',
+    status: 'trial' | 'starter' | 'active' | 'past_due' | 'cancelled',
   ): Promise<User> {
     const user = await this.findById(id);
     if (!user) throw new NotFoundException('Usuario no encontrado');
     user.subscription_status = status;
-    if (status === 'active') {
+    if (status === 'starter' || status === 'active') {
       user.past_due_since = null;
     }
     return this.userRepo.save(user);

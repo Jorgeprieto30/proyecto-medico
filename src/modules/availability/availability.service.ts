@@ -136,20 +136,18 @@ export class AvailabilityService {
       cursor = cursor.plus({ days: 1 });
     }
 
-    // Generar slots para todas las fechas
+    // Generar slots para todas las fechas (secuencial para evitar unbounded parallelism)
     const allSlotsByDate: Record<string, RawSlot[]> = {};
     const allSlotStarts: DateTime[] = [];
 
-    await Promise.all(
-      dates.map(async (d) => {
-        const slots = await this.generateSlots(
-          serviceId, d, service.timezone,
-          service.slotDurationMinutes, service.maxSpots,
-        );
-        allSlotsByDate[d] = slots;
-        allSlotStarts.push(...slots.map((s) => s.slotStart));
-      }),
-    );
+    for (const d of dates) {
+      const slots = await this.generateSlots(
+        serviceId, d, service.timezone,
+        service.slotDurationMinutes, service.maxSpots,
+      );
+      allSlotsByDate[d] = slots;
+      allSlotStarts.push(...slots.map((s) => s.slotStart));
+    }
 
     // Una sola query de reservas para TODOS los slots del rango
     const reservationCounts = await this.getReservationCountsBySlots(serviceId, allSlotStarts);
@@ -395,8 +393,17 @@ export class AvailabilityService {
     const [startH, startM] = dayStartTime.split(':').map(Number);
     const [endH, endM] = dayEndTime.split(':').map(Number);
 
-    let current = localDate.set({ hour: startH, minute: startM, second: 0, millisecond: 0 });
-    const dayEnd = localDate.set({ hour: endH, minute: endM, second: 0, millisecond: 0 });
+    // Usar fromObject con zona explícita evita ambigüedades en cambios de horario (DST)
+    const zone = localDate.zoneName!;
+    const { year, month, day } = localDate;
+    let current = DateTime.fromObject(
+      { year, month, day, hour: startH, minute: startM, second: 0, millisecond: 0 },
+      { zone },
+    );
+    const dayEnd = DateTime.fromObject(
+      { year, month, day, hour: endH, minute: endM, second: 0, millisecond: 0 },
+      { zone },
+    );
 
     while (current < dayEnd) {
       const slotEnd = current.plus({ minutes: slotDurationMinutes });
@@ -481,7 +488,7 @@ export class AvailabilityService {
     for (const row of results) {
       const slotDt = DateTime.fromJSDate(new Date(row.slotStart), { zone: 'UTC' });
       const matchingInput = slotStarts.find(
-        (s) => Math.abs(s.toMillis() - slotDt.toMillis()) < 1000,
+        (s) => s.toMillis() === slotDt.toMillis(),
       );
       if (matchingInput) {
         countMap[matchingInput.toISO()!] = parseInt(row.count, 10);
@@ -509,7 +516,7 @@ export class AvailabilityService {
     );
 
     const matchingSlot = slots.find(
-      (s) => Math.abs(s.slotStart.toMillis() - slotStartDt.toMillis()) < 1000,
+      (s) => s.slotStart.toMillis() === slotStartDt.toMillis(),
     );
 
     if (!matchingSlot) return null;

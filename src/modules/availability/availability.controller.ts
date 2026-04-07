@@ -1,8 +1,12 @@
-import { Controller, Get, Query, ParseBoolPipe, DefaultValuePipe } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Query, ParseBoolPipe, DefaultValuePipe, Req } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
+import { DateTime } from 'luxon';
 import { AvailabilityService } from './availability.service';
 import { SlotAvailabilityDto, SlotDetailDto, SlotSpotsDto } from './dto/availability.dto';
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_RANGE_DAYS = 60;
 
 @ApiTags('availability')
 @Controller('availability')
@@ -13,18 +17,21 @@ export class AvailabilityController {
   @ApiOperation({ summary: 'Consultar disponibilidad por fecha' })
   @ApiQuery({ name: 'service_id', type: String })
   @ApiQuery({ name: 'date', type: String, example: '2026-03-20' })
-  @ApiQuery({ name: 'include_past', type: Boolean, required: false, description: 'Incluir slots pasados (solo para admin)' })
+  @ApiQuery({ name: 'include_past', type: Boolean, required: false, description: 'Incluir slots pasados (solo para admin autenticado)' })
   @ApiResponse({ status: 200, type: [SlotAvailabilityDto] })
   getByDate(
     @Query('service_id') serviceId: string,
     @Query('date') date: string,
     @Query('include_past', new DefaultValuePipe(false), ParseBoolPipe) includePast: boolean,
+    @Req() req: any,
   ): Promise<SlotAvailabilityDto[]> {
-    return this.availabilityService.getAvailabilityByDate(serviceId, date, includePast);
+    // include_past solo se honra para usuarios autenticados (admins)
+    const effectiveIncludePast = includePast && !!req.user;
+    return this.availabilityService.getAvailabilityByDate(serviceId, date, effectiveIncludePast);
   }
 
   @Get('range')
-  @ApiOperation({ summary: 'Consultar disponibilidad por rango de fechas (batch)' })
+  @ApiOperation({ summary: 'Consultar disponibilidad por rango de fechas (batch, máx. 60 días)' })
   @ApiQuery({ name: 'service_id', type: String })
   @ApiQuery({ name: 'start_date', type: String, example: '2026-03-23' })
   @ApiQuery({ name: 'end_date', type: String, example: '2026-03-29' })
@@ -34,8 +41,21 @@ export class AvailabilityController {
     @Query('start_date') startDate: string,
     @Query('end_date') endDate: string,
     @Query('include_past', new DefaultValuePipe(false), ParseBoolPipe) includePast: boolean,
+    @Req() req: any,
   ): Promise<Record<string, any[]>> {
-    return this.availabilityService.getAvailabilityByDateRange(serviceId, startDate, endDate, includePast);
+    if (!DATE_RE.test(startDate) || !DATE_RE.test(endDate)) {
+      throw new BadRequestException('start_date y end_date deben tener formato YYYY-MM-DD');
+    }
+    if (startDate > endDate) {
+      throw new BadRequestException('start_date debe ser menor o igual a end_date');
+    }
+    const diffDays = DateTime.fromISO(endDate).diff(DateTime.fromISO(startDate), 'days').days;
+    if (diffDays > MAX_RANGE_DAYS) {
+      throw new BadRequestException(`El rango máximo permitido es de ${MAX_RANGE_DAYS} días`);
+    }
+    // include_past solo se honra para usuarios autenticados (admins)
+    const effectiveIncludePast = includePast && !!req.user;
+    return this.availabilityService.getAvailabilityByDateRange(serviceId, startDate, endDate, effectiveIncludePast);
   }
 
   @Get('slot')

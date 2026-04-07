@@ -42,7 +42,7 @@ export class User {
   reset_password_expires: Date | null;
 
   @Column({ name: 'subscription_status', type: 'varchar', length: 20, default: 'trial' })
-  subscription_status: 'trial' | 'active' | 'past_due' | 'cancelled';
+  subscription_status: 'trial' | 'starter' | 'active' | 'past_due' | 'cancelled';
 
   @Column({ name: 'stripe_customer_id', type: 'varchar', length: 255, nullable: true })
   stripe_customer_id: string | null;

@@ -38,10 +38,6 @@ export class ReservationsService {
   async create(dto: CreateReservationDto): Promise<Reservation> {
     const service = await this.servicesService.findOne(dto.service_id);
 
-    if (service.userId) {
-      await this.subscriptionService.checkCanCreateReservation(service.userId);
-    }
-
     let slotStartDt: DateTime;
     try {
       slotStartDt = DateTime.fromISO(dto.slot_start, { setZone: true });
@@ -96,13 +92,28 @@ export class ReservationsService {
     }
 
     const saved = await this.dataSource.transaction(async (manager) => {
+      // ── Serializar chequeo de suscripción por usuario (evita TOCTOU) ──────
+      if (service.userId) {
+        await manager.query(
+          `SELECT pg_advisory_xact_lock(
+            ('x' || substr(md5($1), 1, 8))::bit(32)::int4,
+            ('x' || substr(md5($1), 9, 8))::bit(32)::int4
+          )`,
+          [`sub:${service.userId}`],
+        );
+        await this.subscriptionService.checkCanCreateReservation(service.userId);
+      }
+
       let spotNumber: number;
 
       if (dto.spot_number != null) {
         // ── Cupo específico elegido por el cliente ─────────────────────────
         const lockKey = `${dto.service_id}|${slotStartUtc.toISOString()}|${dto.spot_number}`;
         await manager.query(
-          `SELECT pg_advisory_xact_lock(('x' || substr(md5($1), 1, 16))::bit(64)::bigint)`,
+          `SELECT pg_advisory_xact_lock(
+            ('x' || substr(md5($1), 1, 8))::bit(32)::int4,
+            ('x' || substr(md5($1), 9, 8))::bit(32)::int4
+          )`,
           [lockKey],
         );
 
@@ -126,7 +137,10 @@ export class ReservationsService {
         // ── Auto-asignación: lock a nivel de slot completo ─────────────────
         const slotLockKey = `${dto.service_id}|${slotStartUtc.toISOString()}`;
         await manager.query(
-          `SELECT pg_advisory_xact_lock(('x' || substr(md5($1), 1, 16))::bit(64)::bigint)`,
+          `SELECT pg_advisory_xact_lock(
+            ('x' || substr(md5($1), 1, 8))::bit(32)::int4,
+            ('x' || substr(md5($1), 9, 8))::bit(32)::int4
+          )`,
           [slotLockKey],
         );
 
@@ -165,12 +179,15 @@ export class ReservationsService {
         metadata: dto.metadata ?? null,
       });
 
-      return manager.getRepository(Reservation).save(reservation);
-    });
+      const result = await manager.getRepository(Reservation).save(reservation);
 
-    if (service.userId) {
-      await this.subscriptionService.incrementTrialCount(service.userId);
-    }
+      // Incrementar contador de prueba dentro de la misma ventana de lock
+      if (service.userId) {
+        await this.subscriptionService.incrementTrialCount(service.userId);
+      }
+
+      return result;
+    });
 
     return saved;
   }

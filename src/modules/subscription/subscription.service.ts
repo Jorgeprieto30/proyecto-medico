@@ -6,6 +6,13 @@ import { User } from '../users/entities/user.entity';
 import { Service } from '../services/entities/service.entity';
 import { Reservation } from '../reservations/entities/reservation.entity';
 
+/** Límites por plan */
+const PLAN_LIMITS = {
+  trial:   { maxServices: 1,  maxSpots: null }, // sin límite de cupos; limitado por reservas totales
+  starter: { maxServices: 3,  maxSpots: 20   },
+  active:  { maxServices: 10, maxSpots: 50   },
+} as const;
+
 @Injectable()
 export class SubscriptionService {
   constructor(
@@ -18,12 +25,12 @@ export class SubscriptionService {
   ) {}
 
   /**
-   * Verifica si el agente puede crear un nuevo servicio.
+   * Verifica si el agente puede crear un nuevo servicio según su plan.
    * Lanza ForbiddenException con { code, message } si no puede.
    */
   async checkCanCreateService(userId: string): Promise<void> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (!user) return; // usuario no encontrado: dejar pasar (la validación de owner la hace ServicesService)
+    if (!user) return;
 
     switch (user.subscription_status) {
       case 'cancelled':
@@ -36,20 +43,42 @@ export class SubscriptionService {
         this.assertGracePeriod(user);
         break;
 
-      case 'trial': {
+      case 'trial':
+      case 'starter':
+      case 'active': {
+        const limits = PLAN_LIMITS[user.subscription_status];
         const activeCount = await this.serviceRepo.count({
           where: { userId: user.id, isActive: true },
         });
-        if (activeCount >= 1) {
+        if (activeCount >= limits.maxServices) {
+          const planName = { trial: 'Trial', starter: 'Básico', active: 'Pro' }[user.subscription_status];
           throw new ForbiddenException({
-            code: 'TRIAL_LIMIT_SERVICES',
-            message: 'En el plan trial solo puedes tener 1 servicio activo. Suscríbete para crear más.',
+            code: 'PLAN_LIMIT_SERVICES',
+            message: `El plan ${planName} permite máximo ${limits.maxServices} evento(s) activo(s). Actualiza tu plan para crear más.`,
           });
         }
         break;
       }
+    }
+  }
 
-      // 'active': sin restricción
+  /**
+   * Verifica que los cupos solicitados no excedan el límite del plan.
+   * Llamar al crear o actualizar un servicio cuando maxSpots cambia.
+   */
+  async checkServiceSpotLimit(userId: string, maxSpots: number): Promise<void> {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) return;
+
+    const limits = PLAN_LIMITS[user.subscription_status as keyof typeof PLAN_LIMITS];
+    if (!limits || limits.maxSpots === null) return; // trial sin límite de cupos
+
+    if (maxSpots > limits.maxSpots) {
+      const planName = { trial: 'Trial', starter: 'Básico', active: 'Pro' }[user.subscription_status] ?? user.subscription_status;
+      throw new ForbiddenException({
+        code: 'PLAN_LIMIT_SPOTS',
+        message: `El plan ${planName} permite máximo ${limits.maxSpots} cupos por evento. Actualiza tu plan para aumentar la capacidad.`,
+      });
     }
   }
 
@@ -59,7 +88,7 @@ export class SubscriptionService {
    */
   async checkCanCreateReservation(userId: string): Promise<void> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (!user) return; // servicio sin owner: dejar pasar
+    if (!user) return;
 
     switch (user.subscription_status) {
       case 'cancelled':
@@ -81,7 +110,7 @@ export class SubscriptionService {
         }
         break;
 
-      // 'active': sin restricción
+      // 'starter' y 'active': reservas ilimitadas
     }
   }
 

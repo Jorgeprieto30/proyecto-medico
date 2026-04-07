@@ -17,8 +17,8 @@ export class UpdateProfileDto {
 }
 
 export class UpdateSubscriptionDto {
-  @IsIn(['trial', 'active', 'past_due', 'cancelled'])
-  subscription_status: 'trial' | 'active' | 'past_due' | 'cancelled';
+  @IsIn(['trial', 'starter', 'active', 'past_due', 'cancelled'])
+  subscription_status: 'trial' | 'starter' | 'active' | 'past_due' | 'cancelled';
 }
 
 @ApiTags('users')
