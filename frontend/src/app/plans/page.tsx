@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { getSession, signOut } from 'next-auth/react';
@@ -104,10 +104,8 @@ const plans = [
   },
 ];
 
-export default function PlansPage() {
+function StripeRedirectToast() {
   const searchParams = useSearchParams();
-
-  // Mostrar toast según redirect de Stripe
   useEffect(() => {
     if (searchParams.get('success') === '1') {
       toast.success('¡Pago exitoso! Tu plan se activará en segundos.');
@@ -116,6 +114,10 @@ export default function PlansPage() {
       toast.info('Pago cancelado. Puedes intentarlo cuando quieras.');
     }
   }, [searchParams]);
+  return null;
+}
+
+export default function PlansPage() {
 
   const { data: user, isLoading } = useQuery<UserProfile>({
     queryKey: ['user-me'],
@@ -158,6 +160,9 @@ export default function PlansPage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
+      <Suspense fallback={null}>
+        <StripeRedirectToast />
+      </Suspense>
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Planes</h1>
         <p className="text-gray-500 text-sm mt-1">Administra tu suscripción y accede a todas las funciones</p>
