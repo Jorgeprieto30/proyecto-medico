@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import Stripe from 'stripe';
 import { User } from '../users/entities/user.entity';
 
@@ -14,7 +14,36 @@ export class StripeService {
     }
     this.stripe = new Stripe(secretKey, {
       apiVersion: '2025-02-24.acacia',
+      timeout: 10000, // 10s — el default (80s) deja requests colgados ante caídas de Stripe
+      maxNetworkRetries: 2, // Stripe reintenta automáticamente errores de red (429, 5xx)
     });
+  }
+
+  // ─── Error handling ───────────────────────────────────────────────────────
+
+  /**
+   * Traduce errores del SDK de Stripe a excepciones NestJS amigables.
+   * Evita exponer mensajes crudos de Stripe al cliente y registra
+   * el detalle técnico solo en los logs del servidor.
+   */
+  private handleStripeError(err: unknown, context: string): never {
+    if (err instanceof Stripe.errors.StripeError) {
+      this.logger.error(`Stripe error en ${context}: [${err.type}] ${err.message}`);
+
+      if (err instanceof Stripe.errors.StripeConnectionError) {
+        throw new ServiceUnavailableException(
+          'El servicio de pagos no está disponible temporalmente. Intenta en unos segundos.',
+        );
+      }
+      if (err instanceof Stripe.errors.StripeRateLimitError) {
+        throw new ServiceUnavailableException(
+          'Demasiadas solicitudes al servicio de pagos. Intenta en unos segundos.',
+        );
+      }
+    }
+    // Error inesperado no relacionado con Stripe
+    this.logger.error(`Error inesperado en ${context}`, err instanceof Error ? err.stack : String(err));
+    throw new InternalServerErrorException('Error inesperado al procesar el pago.');
   }
 
   // ─── Clientes ─────────────────────────────────────────────────────────────
@@ -31,15 +60,19 @@ export class StripeService {
     user: Pick<User, 'email' | 'name'>,
     idempotencyKey: string,
   ): Promise<string> {
-    const customer = await this.stripe.customers.create(
-      {
-        email: user.email,
-        name: user.name,
-        metadata: { source: 'agenda-cupos' },
-      },
-      { idempotencyKey },
-    );
-    return customer.id;
+    try {
+      const customer = await this.stripe.customers.create(
+        {
+          email: user.email,
+          name: user.name,
+          metadata: { source: 'agenda-cupos' },
+        },
+        { idempotencyKey },
+      );
+      return customer.id;
+    } catch (err) {
+      this.handleStripeError(err, 'createCustomer');
+    }
   }
 
   /**
@@ -79,18 +112,21 @@ export class StripeService {
       );
     }
 
-    const session = await this.stripe.checkout.sessions.create({
-      mode: 'subscription',
-      customer: user.stripe_customer_id,
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      allow_promotion_codes: true,
-      // userId en metadata para identificar al usuario en el webhook checkout.session.completed
-      metadata: { userId: user.id },
-    });
-
-    return session.url!;
+    try {
+      const session = await this.stripe.checkout.sessions.create({
+        mode: 'subscription',
+        customer: user.stripe_customer_id,
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        allow_promotion_codes: true,
+        // userId en metadata para identificar al usuario en el webhook checkout.session.completed
+        metadata: { userId: user.id },
+      });
+      return session.url!;
+    } catch (err) {
+      this.handleStripeError(err, 'createCheckoutSession');
+    }
   }
 
   // ─── Portal de cliente ────────────────────────────────────────────────────
@@ -112,12 +148,15 @@ export class StripeService {
       );
     }
 
-    const session = await this.stripe.billingPortal.sessions.create({
-      customer: user.stripe_customer_id,
-      return_url: returnUrl,
-    });
-
-    return session.url;
+    try {
+      const session = await this.stripe.billingPortal.sessions.create({
+        customer: user.stripe_customer_id,
+        return_url: returnUrl,
+      });
+      return session.url;
+    } catch (err) {
+      this.handleStripeError(err, 'createPortalSession');
+    }
   }
 
   // ─── Webhooks ─────────────────────────────────────────────────────────────

@@ -11,7 +11,7 @@ import {
 import { SkipThrottle } from '@nestjs/throttler';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Request } from 'express';
 import Stripe from 'stripe';
 import { Public } from '../auth/decorators/public.decorator';
@@ -68,6 +68,7 @@ export class StripeWebhookController {
 
   constructor(
     private readonly stripeService: StripeService,
+    private readonly dataSource: DataSource,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     @InjectRepository(Service)
@@ -143,17 +144,22 @@ export class StripeWebhookController {
       //
       // ERROR DE NEGOCIO (usuario no existe, priceId desconocido):
       //   → solo loguear → retornar 200 → Stripe no reintenta (no tiene sentido)
+      // Sanitizar: usar err.constructor.name en lugar de err.message para evitar
+      // filtrar PII (emails, datos de tarjeta) que Stripe puede incluir en mensajes de error.
+      const errType = err?.constructor?.name ?? 'UnknownError';
+      const errMsg = err instanceof Error ? err.message : String(err);
+
       if (isTransientError(err)) {
         this.logger.error(
-          `Error transitorio procesando ${event.type} [${event.id}], Stripe reintentará: ${err.message}`,
-          err.stack,
+          `Error transitorio [${errType}] procesando ${event.type} [${event.id}], Stripe reintentará: ${errMsg}`,
+          err instanceof Error ? err.stack : undefined,
         );
         throw new InternalServerErrorException('Error de infraestructura temporal. Stripe reintentará el evento.');
       }
 
       this.logger.error(
-        `Error de negocio procesando ${event.type} [${event.id}]: ${err.message}`,
-        err.stack,
+        `Error de negocio [${errType}] procesando ${event.type} [${event.id}]: ${errMsg}`,
+        err instanceof Error ? err.stack : undefined,
       );
       // Retornar 200 implícito — Stripe no necesita reintentar errores de negocio
     }
@@ -252,16 +258,20 @@ export class StripeWebhookController {
     // Esto previene que eventos stale conviertan 'cancelled' → 'active'.
     const wasPaymentIssue = user.subscription_status === 'past_due';
 
-    await this.userRepo.update(user.id, {
-      subscription_status: wasPaymentIssue ? newStatus : user.subscription_status,
-      stripe_price_id: priceId,
-      current_period_end: periodEnd(sub),
-      past_due_since: null,
+    // Transacción atómica: user + services se actualizan juntos o ninguno
+    await this.dataSource.transaction(async (manager) => {
+      await manager.update(User, user.id, {
+        subscription_status: wasPaymentIssue ? newStatus : user.subscription_status,
+        stripe_price_id: priceId,
+        current_period_end: periodEnd(sub),
+        past_due_since: null,
+      });
+      if (wasPaymentIssue) {
+        await manager.update(Service, { userId: user.id }, { isVisible: true });
+      }
     });
 
-    // Si se recuperó de past_due, reactivar servicios que estaban ocultos
     if (wasPaymentIssue) {
-      await this.serviceRepo.update({ userId: user.id }, { isVisible: true });
       this.logger.log(`Servicios reactivados para userId=${user.id} (recuperado de past_due)`);
     }
 
@@ -366,14 +376,17 @@ export class StripeWebhookController {
       return;
     }
 
-    await this.userRepo.update(user.id, {
-      subscription_status: 'cancelled',
-      stripe_subscription_id: null,
-      stripe_price_id: null,
-      current_period_end: null,
+    // Transacción atómica: si ocultar servicios falla, el usuario no queda
+    // cancelado con servicios visibles aceptando reservas sin cobrar.
+    await this.dataSource.transaction(async (manager) => {
+      await manager.update(User, user.id, {
+        subscription_status: 'cancelled',
+        stripe_subscription_id: null,
+        stripe_price_id: null,
+        current_period_end: null,
+      });
+      await manager.update(Service, { userId: user.id }, { isVisible: false });
     });
-
-    await this.serviceRepo.update({ userId: user.id }, { isVisible: false });
 
     this.logger.log(`Suscripción cancelada: userId=${user.id}`);
   }

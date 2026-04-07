@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
 } from 'typeorm';
 
 @Entity('users')
@@ -44,9 +45,11 @@ export class User {
   @Column({ name: 'subscription_status', type: 'varchar', length: 20, default: 'trial' })
   subscription_status: 'trial' | 'starter' | 'active' | 'past_due' | 'cancelled';
 
+  @Index()
   @Column({ name: 'stripe_customer_id', type: 'varchar', length: 255, nullable: true })
   stripe_customer_id: string | null;
 
+  @Index()
   @Column({ name: 'stripe_subscription_id', type: 'varchar', length: 255, nullable: true })
   stripe_subscription_id: string | null;
 
