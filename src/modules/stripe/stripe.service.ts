@@ -21,15 +21,40 @@ export class StripeService {
 
   /**
    * Crea un Customer en Stripe y retorna su ID.
-   * Llamar una sola vez al registrar el usuario.
+   *
+   * @param user           - Datos del usuario (email + nombre).
+   * @param idempotencyKey - Clave de idempotencia (Parche #3): Stripe deduplica
+   *                         si se llama dos veces con la misma clave en 24h.
+   *                         Usar formato `customer-{userId}`.
    */
-  async createCustomer(user: Pick<User, 'email' | 'name'>): Promise<string> {
-    const customer = await this.stripe.customers.create({
-      email: user.email,
-      name: user.name,
-      metadata: { source: 'agenda-cupos' },
-    });
+  async createCustomer(
+    user: Pick<User, 'email' | 'name'>,
+    idempotencyKey: string,
+  ): Promise<string> {
+    const customer = await this.stripe.customers.create(
+      {
+        email: user.email,
+        name: user.name,
+        metadata: { source: 'agenda-cupos' },
+      },
+      { idempotencyKey },
+    );
     return customer.id;
+  }
+
+  /**
+   * Elimina un Customer en Stripe.
+   * Usado para limpiar duplicados cuando la race condition en createCustomer
+   * resulta en un Customer que no fue guardado en BD (Parche #3).
+   */
+  async deleteCustomer(customerId: string): Promise<void> {
+    try {
+      await this.stripe.customers.del(customerId);
+      this.logger.log(`Customer duplicado eliminado de Stripe: ${customerId}`);
+    } catch (err: any) {
+      // No crítico: el Customer quedará huérfano pero no causa problemas de facturación
+      this.logger.warn(`No se pudo eliminar Customer duplicado ${customerId}: ${err.message}`);
+    }
   }
 
   // ─── Checkout ─────────────────────────────────────────────────────────────
@@ -38,7 +63,7 @@ export class StripeService {
    * Crea una sesión de Checkout para que el usuario pague su suscripción.
    *
    * @param user       - Usuario autenticado (debe tener stripe_customer_id).
-   * @param priceId    - ID del precio en Stripe (ej. process.env.STRIPE_PRICE_BASICO).
+   * @param priceId    - ID del precio en Stripe. Siempre viene de env vars, nunca del cliente.
    * @param successUrl - URL a la que Stripe redirige tras el pago exitoso.
    * @param cancelUrl  - URL a la que Stripe redirige si el usuario cancela.
    */
@@ -60,9 +85,8 @@ export class StripeService {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: successUrl,
       cancel_url: cancelUrl,
-      // Permite al usuario cambiar la cantidad de asientos en el futuro
       allow_promotion_codes: true,
-      // Datos que vuelven en el webhook checkout.session.completed
+      // userId en metadata para identificar al usuario en el webhook checkout.session.completed
       metadata: { userId: user.id },
     });
 
@@ -75,8 +99,8 @@ export class StripeService {
    * Crea una sesión del Customer Portal para que el usuario gestione
    * su suscripción (cambio de tarjeta, cancelación, upgrade/downgrade).
    *
-   * @param user        - Usuario autenticado (debe tener stripe_customer_id).
-   * @param returnUrl   - URL a la que Stripe redirige al salir del portal.
+   * @param user      - Usuario autenticado (debe tener stripe_customer_id).
+   * @param returnUrl - URL a la que Stripe redirige al salir del portal.
    */
   async createPortalSession(
     user: Pick<User, 'stripe_customer_id'>,
@@ -99,8 +123,9 @@ export class StripeService {
   // ─── Webhooks ─────────────────────────────────────────────────────────────
 
   /**
-   * Verifica la firma del webhook y retorna el evento tipado.
-   * Lanza un error si la firma no es válida.
+   * Verifica la firma HMAC del webhook y retorna el evento tipado.
+   * Lanza un error si la firma no es válida — imposible de falsificar
+   * sin conocer STRIPE_WEBHOOK_SECRET.
    */
   constructWebhookEvent(rawBody: Buffer, signature: string): Stripe.Event {
     const secret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -114,6 +139,7 @@ export class StripeService {
 
   /**
    * Recupera una suscripción de Stripe por su ID.
+   * Se usa en los webhooks para obtener el estado más reciente antes de actualizar BD.
    */
   async retrieveSubscription(subscriptionId: string): Promise<Stripe.Subscription> {
     return this.stripe.subscriptions.retrieve(subscriptionId);

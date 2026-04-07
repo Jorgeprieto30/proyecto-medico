@@ -2,11 +2,13 @@ import {
   BadRequestException,
   Controller,
   Headers,
+  InternalServerErrorException,
   Logger,
   Post,
   RawBodyRequest,
   Req,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -16,6 +18,8 @@ import { Public } from '../auth/decorators/public.decorator';
 import { StripeService } from './stripe.service';
 import { User } from '../users/entities/user.entity';
 import { Service } from '../services/entities/service.entity';
+
+// ─── Helpers de módulo ────────────────────────────────────────────────────────
 
 /** Mapeo de Stripe Price IDs → subscription_status local */
 function priceIdToStatus(priceId: string): 'starter' | 'active' | null {
@@ -29,8 +33,35 @@ function periodEnd(sub: Stripe.Subscription): Date {
   return new Date(sub.current_period_end * 1000);
 }
 
+/**
+ * Determina si un error es transitorio (infraestructura caída) o permanente
+ * (error de negocio como usuario no encontrado).
+ *
+ * Parche #1: solo los errores transitorios deben causar un 500 para que
+ * Stripe reintente. Los errores de negocio deben retornar 200.
+ */
+function isTransientError(err: any): boolean {
+  // Códigos de error de red y PostgreSQL de conexión caída
+  const transientCodes = [
+    'ECONNREFUSED',   // PostgreSQL no responde
+    'ETIMEDOUT',      // Timeout de conexión
+    'ENOTFOUND',      // DNS no resuelve
+    '57P01',          // PostgreSQL: admin shutdown
+    '08006',          // PostgreSQL: connection failure
+    '08001',          // PostgreSQL: unable to connect
+    '08004',          // PostgreSQL: rejected connection
+    'PROTOCOL_CONNECTION_LOST', // MySQL (por si acaso)
+  ];
+  return transientCodes.some(
+    (code) => err.code === code || err.message?.includes(code),
+  );
+}
+
+// ─── Controller ───────────────────────────────────────────────────────────────
+
 @ApiExcludeController()
 @Public()
+@SkipThrottle()   // Parche #5: el ThrottlerGuard global causaría 429s en ráfagas de Stripe
 @Controller('stripe')
 export class StripeWebhookController {
   private readonly logger = new Logger(StripeWebhookController.name);
@@ -43,6 +74,15 @@ export class StripeWebhookController {
     private readonly serviceRepo: Repository<Service>,
   ) {}
 
+  /**
+   * POST /stripe/webhook
+   *
+   * Parches aplicados:
+   *   #1 — Errores transitorios (BD caída) → 500 → Stripe reintenta.
+   *         Errores de negocio (usuario no existe) → 200 → no reintentar.
+   *   #2 — Verifica el status en Stripe antes de reactivar suscripciones canceladas.
+   *   #5 — @SkipThrottle() evita 429s en ráfagas de eventos.
+   */
   @Post('webhook')
   async handleWebhook(
     @Req() req: RawBodyRequest<Request>,
@@ -59,6 +99,7 @@ export class StripeWebhookController {
       );
     }
 
+    // Verificación HMAC: imposible de falsificar sin STRIPE_WEBHOOK_SECRET
     let event: Stripe.Event;
     try {
       event = this.stripeService.constructWebhookEvent(rawBody, signature);
@@ -95,8 +136,26 @@ export class StripeWebhookController {
           this.logger.debug(`Evento no manejado: ${event.type}`);
       }
     } catch (err: any) {
-      // Log el error pero retorna 200 para que Stripe no reintente
-      this.logger.error(`Error procesando ${event.type}: ${err.message}`, err.stack);
+      // Parche #1: diferenciar errores transitorios de errores de negocio.
+      //
+      // ERROR TRANSITORIO (BD caída, red, timeout):
+      //   → lanzar excepción → NestJS responde 500 → Stripe reintenta con backoff
+      //
+      // ERROR DE NEGOCIO (usuario no existe, priceId desconocido):
+      //   → solo loguear → retornar 200 → Stripe no reintenta (no tiene sentido)
+      if (isTransientError(err)) {
+        this.logger.error(
+          `Error transitorio procesando ${event.type} [${event.id}], Stripe reintentará: ${err.message}`,
+          err.stack,
+        );
+        throw new InternalServerErrorException('Error de infraestructura temporal. Stripe reintentará el evento.');
+      }
+
+      this.logger.error(
+        `Error de negocio procesando ${event.type} [${event.id}]: ${err.message}`,
+        err.stack,
+      );
+      // Retornar 200 implícito — Stripe no necesita reintentar errores de negocio
     }
 
     return { received: true };
@@ -111,12 +170,12 @@ export class StripeWebhookController {
   private async onCheckoutCompleted(session: Stripe.Checkout.Session): Promise<void> {
     const userId = session.metadata?.userId;
     if (!userId) {
-      this.logger.warn('checkout.session.completed sin userId en metadata');
+      this.logger.warn('checkout.session.completed sin userId en metadata — ignorado');
       return;
     }
 
     if (session.mode !== 'subscription' || !session.subscription) {
-      return; // Solo procesamos suscripciones
+      return;
     }
 
     const sub = await this.stripeService.retrieveSubscription(
@@ -147,13 +206,18 @@ export class StripeWebhookController {
 
   /**
    * invoice.payment_succeeded
-   * Pago mensual exitoso. Actualizamos current_period_end y nos aseguramos
-   * de que el status sea correcto (puede haber sido past_due y se recuperó).
+   * Pago mensual exitoso. Actualizamos current_period_end.
+   *
+   * Parche #2: antes de reactivar, verificamos que la suscripción en Stripe
+   * siga activa. Esto previene que un evento stale reactiva una suscripción
+   * que ya fue cancelada localmente.
    */
   private async onPaymentSucceeded(invoice: Stripe.Invoice): Promise<void> {
     const customerId = invoice.customer as string;
+
+    // El pago inicial (billing_reason='subscription_create') ya lo procesa
+    // checkout.session.completed. Evitamos doble procesamiento.
     if (!customerId || invoice.billing_reason === 'subscription_create') {
-      // El pago inicial ya lo maneja checkout.session.completed
       return;
     }
 
@@ -169,12 +233,24 @@ export class StripeWebhookController {
       invoice.subscription as string,
     );
 
+    // Parche #2: verificar estado en Stripe antes de actualizar.
+    // Si la suscripción en Stripe NO está activa (fue cancelada, expiró, etc.),
+    // ignoramos el evento aunque haya sido un pago exitoso (puede ser un evento
+    // retrasado o reintentado de un ciclo anterior).
+    if (sub.status !== 'active' && sub.status !== 'trialing') {
+      this.logger.warn(
+        `invoice.payment_succeeded ignorado: suscripción ${sub.id} tiene status "${sub.status}" en Stripe (esperado: active/trialing)`,
+      );
+      return;
+    }
+
     const priceId = sub.items.data[0]?.price.id;
     const newStatus = priceIdToStatus(priceId) ?? user.subscription_status;
 
-    // Si estaba past_due, lo recuperamos
-    const wasPaymentIssue =
-      user.subscription_status === 'past_due' || user.subscription_status === 'cancelled';
+    // Parche #2: solo 'past_due' puede recuperarse aquí.
+    // 'cancelled' no se reactiva por un invoice —  requiere un nuevo Checkout.
+    // Esto previene que eventos stale conviertan 'cancelled' → 'active'.
+    const wasPaymentIssue = user.subscription_status === 'past_due';
 
     await this.userRepo.update(user.id, {
       subscription_status: wasPaymentIssue ? newStatus : user.subscription_status,
@@ -183,13 +259,10 @@ export class StripeWebhookController {
       past_due_since: null,
     });
 
-    // Si se recuperó de past_due, reactivar servicios ocultos
+    // Si se recuperó de past_due, reactivar servicios que estaban ocultos
     if (wasPaymentIssue) {
-      await this.serviceRepo.update(
-        { userId: user.id },
-        { isVisible: true },
-      );
-      this.logger.log(`Servicios reactivados para userId=${user.id}`);
+      await this.serviceRepo.update({ userId: user.id }, { isVisible: true });
+      this.logger.log(`Servicios reactivados para userId=${user.id} (recuperado de past_due)`);
     }
 
     this.logger.log(
@@ -200,6 +273,7 @@ export class StripeWebhookController {
   /**
    * invoice.payment_failed
    * El cobro mensual falló. Marcamos past_due y registramos la fecha.
+   * El SubscriptionService tiene una gracia de 5 días antes de ocultar servicios.
    */
   private async onPaymentFailed(invoice: Stripe.Invoice): Promise<void> {
     const customerId = invoice.customer as string;
@@ -217,7 +291,7 @@ export class StripeWebhookController {
       subscription_status: 'past_due',
     };
 
-    // Solo registramos past_due_since la primera vez
+    // Registrar la fecha del primer fallo para calcular el periodo de gracia de 5 días
     if (!user.past_due_since) {
       update.past_due_since = new Date();
     }
@@ -277,6 +351,7 @@ export class StripeWebhookController {
   /**
    * customer.subscription.deleted
    * La suscripción fue cancelada definitivamente en Stripe.
+   * Se ocultan todos los servicios del usuario.
    */
   private async onSubscriptionDeleted(sub: Stripe.Subscription): Promise<void> {
     const customerId = sub.customer as string;
@@ -298,7 +373,6 @@ export class StripeWebhookController {
       current_period_end: null,
     });
 
-    // Ocultar todos los servicios del usuario
     await this.serviceRepo.update({ userId: user.id }, { isVisible: false });
 
     this.logger.log(`Suscripción cancelada: userId=${user.id}`);
